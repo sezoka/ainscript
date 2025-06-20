@@ -1,6 +1,7 @@
 package ains
 
 import "./core"
+import "./parser"
 import "core:os"
 import "core:log"
 import "./tokenizer"
@@ -20,7 +21,8 @@ main :: proc() {
     tokens, tokenize_ok := tokenizer.tokenize(string(src))
     if !tokenize_ok do return
 
-    tokenizer.printTokens(tokens)
+    // tokenizer.printTokens(tokens)
+    parser.parseFile(tokens)
 }
 
 readFile :: proc(path: string) -> ([]u8, bool) {

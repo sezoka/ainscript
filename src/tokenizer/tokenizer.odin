@@ -40,6 +40,7 @@ Token :: struct {
     loc: core.Location,
     kind: TokenKind,
     value: TokenValue,
+    lexeme: string,
 }
 
 makeToken :: proc(t: ^Tokenizer, kind: TokenKind, value: TokenValue = {}) -> (Token, bool) {
@@ -47,6 +48,7 @@ makeToken :: proc(t: ^Tokenizer, kind: TokenKind, value: TokenValue = {}) -> (To
         loc = t.curr_token_loc,
         kind = kind,
         value = value,
+        lexeme = getLexeme(t),
     }, true
 }
 
