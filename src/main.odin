@@ -3,8 +3,10 @@ package ains
 import "./core"
 import "./parser"
 import "core:os"
+import "core:fmt"
 import "core:log"
 import "./tokenizer"
+import "./interpreter"
 import vmem "core:mem/virtual"
 
 main :: proc() {
@@ -22,7 +24,12 @@ main :: proc() {
     if !tokenize_ok do return
 
     // tokenizer.printTokens(tokens)
-    parser.parseFile(tokens)
+    file_ast, parse_ok := parser.parseFile(tokens)
+    if !parse_ok do return
+
+    interpreter.interpretFile(file_ast)
+
+    // fmt.println(file_ast)
 }
 
 readFile :: proc(path: string) -> ([]u8, bool) {

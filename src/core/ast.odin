@@ -10,11 +10,32 @@ Stmt :: struct {
 }
 
 StmtVart :: union {
-    StmtExpr,
+    ExprStmt,
+    VarStmt,
+    AssignStmt,
+    BlockStmt,
 }
 
-StmtExpr :: struct {
+BlockStmt :: struct {
+    stmts: []^Stmt,
+}
+
+VarStmt :: struct {
+    name: string,
+    value: ^Expr,
+}
+
+AssignStmt :: struct {
+    name: string,
+    value: ^Expr,
+}
+
+ExprStmt :: struct {
     expr: ^Expr,
+}
+
+IdentExpr :: struct {
+    name: string,
 }
 
 LiteralExpr :: union {
@@ -42,5 +63,6 @@ Expr :: struct {
 ExprVart :: union {
     LiteralExpr,
     BinaryExpr,
+    IdentExpr,
 }
 

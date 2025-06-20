@@ -20,12 +20,15 @@ TokenKind :: enum {
     Ident,
     LeftParen,
     RightParen,
+    LeftBrace,
+    RightBrace,
     Equal,
     EqualEqual,
     Colon,
     Semicolon,
     Less,
     Greater,
+    Var,
     Eof,
 }
 
@@ -57,6 +60,7 @@ makeKeywordsMap :: proc() -> (keywords: map[string]TokenKind) {
     keywords["end"] = .End
     keywords["for"] = .For
     keywords["do"] = .Do
+    keywords["var"] = .Var
     return keywords
 }
 
@@ -195,6 +199,8 @@ nextToken :: proc(t: ^Tokenizer) -> (Token, bool) {
     case '/': return makeToken(t, .Slash)
     case '(': return makeToken(t, .LeftParen)
     case ')': return makeToken(t, .RightParen)
+    case '{': return makeToken(t, .LeftBrace)
+    case '}': return makeToken(t, .RightBrace)
     case ':': return makeToken(t, .Colon)
     case ';': return makeToken(t, .Semicolon)
     case '<': return makeToken(t, .Less)
