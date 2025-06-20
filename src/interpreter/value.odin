@@ -5,10 +5,20 @@ import "core:fmt"
 
 Value :: union {
     core.Number,
+    core.Func,
+    core.Nil,
 }
 
 makeValue_Number :: proc(n: core.Number) -> Value {
     return n
+}
+
+makeValue_Nil :: proc() -> Value {
+    return core.Nil(nil)
+}
+
+makeValue_Func :: proc(name: string, params: []string, body: []^core.Stmt) -> Value {
+    return core.Func{ name, params, body }
 }
 
 printValue :: proc(val: Value) {
@@ -16,6 +26,10 @@ printValue :: proc(val: Value) {
     case core.Number:
         num := normalizeNumber(v)
         fmt.printfln("%v/%v", num.numeral, num.denominator)
+    case core.Func:
+        fmt.printfln("func(%s)%v", v.name, v.params)
+    case core.Nil:
+        fmt.println("nil")
     }
 }
 

@@ -39,14 +39,32 @@ expectSemicolon :: proc(p: ^Parser) -> bool {
     }
 }
 
-
-
 parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
-    if matches(p, .LeftBrace) {
+    loc := peek(p).loc
+
+    if matches(p, .Def) {
+        maybe_ident_tok := next(p)
+        if maybe_ident_tok.kind == .Ident {
+            name := maybe_ident_tok.value.(string) 
+            expect(p, .LeftParen, "expect '(' after function name")
+            expect(p, .RightParen, "expect ')' after function parameters")
+            stmts : [dynamic]^core.Stmt
+
+            for !matches(p, .End) {
+                append(&stmts, parseStmt(p) or_return)
+            }
+
+            return makeStmt(loc, core.FuncStmt{name = name, body = stmts[:]})
+        } else {
+            reportError(p, loc, "expect variable name, but got '%v'", maybe_ident_tok.lexeme)
+            return {}, false
+        }
+    } else if matches(p, .LeftBrace) {
         stmts : [dynamic]^core.Stmt
         for !matches(p, .RightBrace) {
             append(&stmts, parseStmt(p) or_return)
         }
+        return makeStmt(loc, core.BlockStmt{stmts = stmts[:]})
     } else if matches(p, .Var) {
         ident_expr := parseExpr(p) or_return
         ident, is_ident := ident_expr.vart.(core.IdentExpr)
@@ -91,13 +109,13 @@ parseExpr :: proc(p: ^Parser) -> (^core.Expr, bool) {
 }
 
 parseBinary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
-    left := parsePrimary(p) or_return
+    left := parseCall(p) or_return
 
     bin_op_tokens := [?]tokenizer.TokenKind{ .Plus, .Minus, .Star, .Slash }
     for tok, matches := matchesAny(p, bin_op_tokens[:]);
             matches;
             tok, matches = matchesAny(p, bin_op_tokens[:]) {
-        right := parsePrimary(p) or_return
+        right := parseCall(p) or_return
 
         op : core.BinOp
         #partial switch tok {
@@ -145,6 +163,15 @@ matchesAny :: proc(p: ^Parser, toks: []tokenizer.TokenKind) -> (tokenizer.TokenK
         }
     }
     return {}, false
+}
+
+parseCall :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
+    callable := parsePrimary(p) or_return
+    if matches(p, .LeftParen) {
+        expect(p, .RightParen, "expect ')' after call arguments")
+        return makeExpr(callable.loc, core.CallExpr{callable = callable})
+    }
+    return callable, true
 }
 
 parsePrimary :: proc(p: ^Parser) -> (^core.Expr, bool) {

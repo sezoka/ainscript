@@ -14,10 +14,22 @@ StmtVart :: union {
     VarStmt,
     AssignStmt,
     BlockStmt,
+    FuncStmt,
 }
 
 BlockStmt :: struct {
     stmts: []^Stmt,
+}
+
+FuncStmt :: struct {
+    name: string,
+    params: []string,
+    body: []^Stmt,
+}
+
+CallExpr :: struct {
+    callable: ^Expr,
+    params: []^Expr,
 }
 
 VarStmt :: struct {
@@ -64,5 +76,6 @@ ExprVart :: union {
     LiteralExpr,
     BinaryExpr,
     IdentExpr,
+    CallExpr,
 }
 

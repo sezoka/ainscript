@@ -95,10 +95,12 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
         return assignVariable(intr, stmt.loc, v.name, val)
     case core.BlockStmt:
         pushScope(intr); defer popScope(intr)
-
         for stmt in v.stmts {
             interpretStmt(intr, stmt)
         }
+    case core.FuncStmt:
+        func := makeValue_Func(v.name, nil, v.body)
+        defineVariable(intr, stmt.loc, v.name, func)
     }
     return true
 }
@@ -141,6 +143,19 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: Value, ok: 
         case core.Number: {
             return lit_expr, true
         }
+        }
+    case core.CallExpr:
+        maybe_func := interpretExpr(intr, e.callable) or_return
+        func, is_func := maybe_func.(core.Func)
+        if is_func {
+            pushScope(intr); defer popScope(intr)
+            for stmt in func.body {
+                interpretStmt(intr, stmt) or_return
+            }
+            return makeValue_Nil(), true
+        } else {
+            reportError(expr.loc, "can call only function expressions, but got '%v'", maybe_func)
+            return {}, false
         }
     }
 

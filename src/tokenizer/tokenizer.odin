@@ -13,7 +13,7 @@ TokenKind :: enum {
     Minus,
     Star,
     Slash,
-    Fn,
+    Def,
     End,
     For,
     Do,
@@ -56,7 +56,7 @@ makeToken :: proc(t: ^Tokenizer, kind: TokenKind, value: TokenValue = {}) -> (To
 }
 
 makeKeywordsMap :: proc() -> (keywords: map[string]TokenKind) {
-    keywords["fn"] = .Fn
+    keywords["def"] = .Def
     keywords["end"] = .End
     keywords["for"] = .For
     keywords["do"] = .Do
