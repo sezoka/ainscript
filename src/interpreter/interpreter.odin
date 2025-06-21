@@ -99,7 +99,7 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
             interpretStmt(intr, stmt)
         }
     case core.FuncStmt:
-        func := makeValue_Func(v.name, nil, v.body)
+        func := makeValue_Func(v.name, v.params, v.body)
         defineVariable(intr, stmt.loc, v.name, func)
     }
     return true
@@ -149,6 +149,19 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: Value, ok: 
         func, is_func := maybe_func.(core.Func)
         if is_func {
             pushScope(intr); defer popScope(intr)
+
+            if len(func.params) == len(e.args) {
+                for i in 0..<len(func.params) {
+                    arg := interpretExpr(intr, e.args[i]) or_return
+                    defineVariable(intr, expr.loc, func.params[i].name, arg)
+                }
+            } else {
+                reportError(expr.loc,
+                    "number of function params and passed arguments don't match: '%d' vs '%d'",
+                    len(func.params), len(e.args))
+                return {}, false
+            }
+
             for stmt in func.body {
                 interpretStmt(intr, stmt) or_return
             }

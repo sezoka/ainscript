@@ -29,6 +29,7 @@ TokenKind :: enum {
     Less,
     Greater,
     Var,
+    Comma,
     Eof,
 }
 
@@ -92,7 +93,7 @@ tokenize :: proc(src: string) -> ([]Token, bool) {
         }
     }
 
-    return tokens[:], true
+    return tokens[:], !tkz.had_error
 }
 
 printTokens :: proc(tokens: []Token) {
@@ -205,6 +206,7 @@ nextToken :: proc(t: ^Tokenizer) -> (Token, bool) {
     case ';': return makeToken(t, .Semicolon)
     case '<': return makeToken(t, .Less)
     case '>': return makeToken(t, .Greater)
+    case ',': return makeToken(t, .Comma)
     case '=': 
         if peekNext(t) == '=' {
             return makeToken(t, .EqualEqual)

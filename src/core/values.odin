@@ -7,8 +7,12 @@ Number :: struct {
 
 Func :: struct {
     name: string,
-    params: []string,
+    params: []FuncParam,
     body: []^Stmt,
+}
+
+FuncParam :: struct {
+    name: string,
 }
 
 Nil :: distinct ^u8

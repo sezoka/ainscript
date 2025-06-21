@@ -46,15 +46,29 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
         maybe_ident_tok := next(p)
         if maybe_ident_tok.kind == .Ident {
             name := maybe_ident_tok.value.(string) 
+
+            params : [dynamic]core.FuncParam
+
             expect(p, .LeftParen, "expect '(' after function name")
+            for peek(p).kind != .RightParen {
+                param_name_tok := next(p)
+                if param_name_tok.kind == .Ident {
+                    param_name := param_name_tok.value.(string)
+                    append(&params, core.FuncParam{name=param_name})
+                } else {
+                    reportError(p, loc, "expect param name, but got '%v'", param_name_tok.lexeme)
+                    return {}, false
+                }
+            }
             expect(p, .RightParen, "expect ')' after function parameters")
+
             stmts : [dynamic]^core.Stmt
 
             for !matches(p, .End) {
                 append(&stmts, parseStmt(p) or_return)
             }
 
-            return makeStmt(loc, core.FuncStmt{name = name, body = stmts[:]})
+            return makeStmt(loc, core.FuncStmt{name = name, body = stmts[:], params=params[:]})
         } else {
             reportError(p, loc, "expect variable name, but got '%v'", maybe_ident_tok.lexeme)
             return {}, false
@@ -168,8 +182,16 @@ matchesAny :: proc(p: ^Parser, toks: []tokenizer.TokenKind) -> (tokenizer.TokenK
 parseCall :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
     callable := parsePrimary(p) or_return
     if matches(p, .LeftParen) {
+        args : [dynamic]^core.Expr
+        for peek(p).kind != .RightParen {
+            arg := parseExpr(p) or_return
+            append(&args, arg)
+            if matches(p, .Comma) {
+                continue
+            }
+        }
         expect(p, .RightParen, "expect ')' after call arguments")
-        return makeExpr(callable.loc, core.CallExpr{callable = callable})
+        return makeExpr(callable.loc, core.CallExpr{callable=callable, args=args[:]})
     }
     return callable, true
 }

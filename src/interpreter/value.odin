@@ -17,7 +17,7 @@ makeValue_Nil :: proc() -> Value {
     return core.Nil(nil)
 }
 
-makeValue_Func :: proc(name: string, params: []string, body: []^core.Stmt) -> Value {
+makeValue_Func :: proc(name: string, params: []core.FuncParam, body: []^core.Stmt) -> Value {
     return core.Func{ name, params, body }
 }
 

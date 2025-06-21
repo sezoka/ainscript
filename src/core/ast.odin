@@ -23,13 +23,13 @@ BlockStmt :: struct {
 
 FuncStmt :: struct {
     name: string,
-    params: []string,
+    params: []FuncParam,
     body: []^Stmt,
 }
 
 CallExpr :: struct {
     callable: ^Expr,
-    params: []^Expr,
+    args: []^Expr,
 }
 
 VarStmt :: struct {

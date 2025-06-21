@@ -6,8 +6,9 @@ var y = 123;
 }
 
 
-def test()
-    2 + 2;
+def test(a b c)
+    a + b + c;
+    // return a + b + c;
 end
 
 def main()
@@ -16,7 +17,9 @@ end
 
 main();
 
-x;
+// x;
+
+test(1, 2, 8);
 
 // def factorial(N)
 //     var fact = 1;
