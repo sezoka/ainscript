@@ -1,3 +1,5 @@
+builtin print(val) end
+
 var x = 123 * 6;
 var y = 123;
 
@@ -5,36 +7,45 @@ var y = 123;
     var x = 2;
 }
 
+def test2(a)
+    return a + 2;
+end
 
 def test(a b c)
-    a + b + c;
-    // return a + b + c;
+    return test2(a) + b + c;
 end
 
-def main()
-    69;
-end
-
-main();
-
-// x;
+print(test(1, 2, 3));
 
 test(1, 2, 8);
 
-// def factorial(N)
-//     var fact = 1;
-//     var i = 0;
-// 
-//     for var i = 1; i <= N; i += 1 do
-//         fact *= i;
-//     end
-// 
-//     return fact;
-// end
-// 
-// fn main()
-//     123.456;
-//     factorial(123);
-// end
-// 
-// 
+def factorial(N)
+    var fact = 1;
+
+    var i = 1;
+    while i <= N do
+        fact = fact * i;
+        i = i + 1;
+    end
+
+    return fact;
+end
+
+def factorial(n) {
+    if n == 1 {
+        return 1;
+    }
+
+    return n * factorial(n - 1);
+}
+
+def main()
+    var cond = true;
+    while cond do
+        print(123);
+        cond = false;
+    end
+    print(factorial(30));
+end
+
+main();

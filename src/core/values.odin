@@ -8,7 +8,8 @@ Number :: struct {
 Func :: struct {
     name: string,
     params: []FuncParam,
-    body: []^Stmt,
+    body: ^Stmt,
+    is_builtin: bool,
 }
 
 FuncParam :: struct {
@@ -16,3 +17,5 @@ FuncParam :: struct {
 }
 
 Nil :: distinct ^u8
+
+Bool :: bool

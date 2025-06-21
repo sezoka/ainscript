@@ -7,18 +7,27 @@ Value :: union {
     core.Number,
     core.Func,
     core.Nil,
+    core.Bool,
 }
 
 makeValue_Number :: proc(n: core.Number) -> Value {
     return n
 }
 
+makeValue_Bool :: proc(v: bool) -> Value {
+    return v
+}
+
 makeValue_Nil :: proc() -> Value {
     return core.Nil(nil)
 }
 
-makeValue_Func :: proc(name: string, params: []core.FuncParam, body: []^core.Stmt) -> Value {
-    return core.Func{ name, params, body }
+makeValue_Func :: proc(name: string,
+    params: []core.FuncParam,
+    body: ^core.Stmt,
+    is_builtin := false,
+) -> Value {
+    return core.Func{ name, params, body, is_builtin }
 }
 
 printValue :: proc(val: Value) {
@@ -30,6 +39,8 @@ printValue :: proc(val: Value) {
         fmt.printfln("func(%s)%v", v.name, v.params)
     case core.Nil:
         fmt.println("nil")
+    case core.Bool:
+        fmt.println(v)
     }
 }
 

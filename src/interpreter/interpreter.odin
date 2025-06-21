@@ -7,6 +7,8 @@ import "core:strings"
 
 Interpreter :: struct {
     scopes: [dynamic]Scope,
+    ret_value: Value,
+    is_in_func: bool,
 }
 
 Scope :: struct {
@@ -80,10 +82,32 @@ findVar :: proc(intr: ^Interpreter, loc: core.Location, name: string) -> (Value,
 
 interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
     switch v in stmt.vart {
+    case core.WhileStmt:
+        for {
+            cond_res := interpretExpr(intr, v.cond) or_return
+            cond_bool, is_bool := cond_res.(bool)
+            if is_bool {
+                if cond_bool {
+                    interpretStmt(intr, v.body)
+                } else {
+                    break
+                }
+            } else {
+                reportError(v.cond.loc, "expect bool as conditional value, but got: '%v'", cond_res)
+                return false
+            }
+        }
+    case core.RetStmt:
+        if v.expr == nil {
+            intr.ret_value = makeValue_Nil()
+            return true
+        } else {
+            intr.ret_value = interpretExpr(intr, v.expr) or_return
+            return true
+        }
     case core.ExprStmt:
         val, ok := interpretExpr(intr, v.expr)
         if !ok do return false
-        printValue(val)
         return ok
     case core.VarStmt:
         val, ok := interpretExpr(intr, v.value)
@@ -97,9 +121,11 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
         pushScope(intr); defer popScope(intr)
         for stmt in v.stmts {
             interpretStmt(intr, stmt)
+            _, is_ret_stmt := stmt.vart.(core.RetStmt)
+            if is_ret_stmt do return true;
         }
     case core.FuncStmt:
-        func := makeValue_Func(v.name, v.params, v.body)
+        func := makeValue_Func(v.name, v.params, v.body, v.is_builtin)
         defineVariable(intr, stmt.loc, v.name, func)
     }
     return true
@@ -132,6 +158,18 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: Value, ok: 
                 num.numeral = a.numeral * b.denominator
                 num.denominator = a.denominator * b.numeral
                 return makeValue_Number(num), true
+            case .Less:
+                return makeValue_Bool(a.numeral * b.denominator < b.numeral * a.denominator), true
+            case .Greater:
+                return makeValue_Bool(a.numeral * b.denominator > b.numeral * a.denominator), true
+            case .LessEqual:
+                return makeValue_Bool(a.numeral * b.denominator <= b.numeral * a.denominator), true
+            case .GreaterEqual:
+                return makeValue_Bool(a.numeral * b.denominator >= b.numeral * a.denominator), true
+            case .Equal:
+                return makeValue_Bool(a.numeral * b.denominator == b.numeral * a.denominator), true
+            case .NotEqual:
+                return makeValue_Bool(a.numeral * b.denominator != b.numeral * a.denominator), true
             }
         } else {
             reportError(expr.loc, "operator %v expects number operands, but got '%v' and '%v'", e.op, a, b)
@@ -140,20 +178,41 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: Value, ok: 
         return findVar(intr, expr.loc, e.name)
     case core.LiteralExpr:
         switch lit_expr in e {
-        case core.Number: {
+        case core.Number:
             return lit_expr, true
-        }
+        case core.Bool: 
+            return lit_expr, true
         }
     case core.CallExpr:
         maybe_func := interpretExpr(intr, e.callable) or_return
         func, is_func := maybe_func.(core.Func)
-        if is_func {
-            pushScope(intr); defer popScope(intr)
 
+        if is_func {
             if len(func.params) == len(e.args) {
+                pushScope(intr); defer popScope(intr)
                 for i in 0..<len(func.params) {
                     arg := interpretExpr(intr, e.args[i]) or_return
                     defineVariable(intr, expr.loc, func.params[i].name, arg)
+                }
+
+                if func.is_builtin {
+                    if func.name == "print" {
+                        val := currScope(intr).vars["val"]
+                        printValue(val)
+                        return makeValue_Nil(), true
+                    } else {
+                        log.error("unhandled")
+                        return {}, false
+                    }
+                } else {
+                    prev_is_in_func := intr.is_in_func
+                    defer intr.is_in_func = prev_is_in_func
+                    defer intr.ret_value = makeValue_Nil()
+                    intr.is_in_func = true
+
+                    interpretStmt(intr, func.body)
+
+                    return intr.ret_value, true
                 }
             } else {
                 reportError(expr.loc,
@@ -161,11 +220,6 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: Value, ok: 
                     len(func.params), len(e.args))
                 return {}, false
             }
-
-            for stmt in func.body {
-                interpretStmt(intr, stmt) or_return
-            }
-            return makeValue_Nil(), true
         } else {
             reportError(expr.loc, "can call only function expressions, but got '%v'", maybe_func)
             return {}, false

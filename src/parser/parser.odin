@@ -40,9 +40,29 @@ expectSemicolon :: proc(p: ^Parser) -> bool {
 }
 
 parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
-    loc := peek(p).loc
+    tok := peek(p)
+    loc := tok.loc
 
-    if matches(p, .Def) {
+    if matches(p, .While) {
+        cond_expr := parseExpr(p) or_return
+        block_loc := peek(p).loc
+        expect(p, .Do, "expect 'do' after conditional expression")
+        stmts : [dynamic]^core.Stmt
+        for !matches(p, .End) {
+            stmt := parseStmt(p) or_return
+            append(&stmts, stmt)
+        }
+        return makeStmt(loc, core.WhileStmt{body = makeBlockStmt(block_loc, stmts[:]), cond = cond_expr}) 
+    } else if matches(p, .Return) {
+        if matches(p, .Semicolon) {
+            return makeStmt(loc, core.RetStmt{expr = nil})
+        } else {
+            expr := parseExpr(p) or_return
+            expectSemicolon(p)
+            return makeStmt(loc, core.RetStmt{expr = expr}) 
+        }
+    } else if matches(p, .Def) || matches(p, .Builtin) {
+        is_builtin := tok.kind == .Builtin
         maybe_ident_tok := next(p)
         if maybe_ident_tok.kind == .Ident {
             name := maybe_ident_tok.value.(string) 
@@ -64,11 +84,18 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
 
             stmts : [dynamic]^core.Stmt
 
+            body_loc := peek(p).loc
+
             for !matches(p, .End) {
                 append(&stmts, parseStmt(p) or_return)
             }
 
-            return makeStmt(loc, core.FuncStmt{name = name, body = stmts[:], params=params[:]})
+            return makeStmt(loc, core.FuncStmt{
+                name = name,
+                body = makeBlockStmt(body_loc, stmts[:]),
+                params=params[:],
+                is_builtin = is_builtin}
+            )
         } else {
             reportError(p, loc, "expect variable name, but got '%v'", maybe_ident_tok.lexeme)
             return {}, false
@@ -119,17 +146,45 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
 }
 
 parseExpr :: proc(p: ^Parser) -> (^core.Expr, bool) {
-    return parseBinary(p)
+    return parseLess(p)
 }
 
-parseBinary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
-    left := parseCall(p) or_return
+parseLess :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
+    left := parseSum(p) or_return
 
-    bin_op_tokens := [?]tokenizer.TokenKind{ .Plus, .Minus, .Star, .Slash }
+    bin_op_tokens := [?]tokenizer.TokenKind{ .Less, .LessEqual, .Greater, .GreaterEqual }
     for tok, matches := matchesAny(p, bin_op_tokens[:]);
             matches;
             tok, matches = matchesAny(p, bin_op_tokens[:]) {
-        right := parseCall(p) or_return
+        right := parseSum(p) or_return
+
+        op : core.BinOp
+        #partial switch tok {
+        case .Less:
+            op = .Less
+        case .Greater:
+            op = .Greater
+        case .LessEqual:
+            op = .LessEqual
+        case .GreaterEqual:
+            op = .GreaterEqual
+        case: panic("unreachable")
+        }
+
+        left = makeExpr(left.loc, core.BinaryExpr{left = left, op = op, right = right}) or_return
+    }
+
+    return left, true
+}
+
+parseSum :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
+    left := parseMult(p) or_return
+
+    bin_op_tokens := [?]tokenizer.TokenKind{ .Plus, .Minus }
+    for tok, matches := matchesAny(p, bin_op_tokens[:]);
+            matches;
+            tok, matches = matchesAny(p, bin_op_tokens[:]) {
+        right := parseMult(p) or_return
 
         op : core.BinOp
         #partial switch tok {
@@ -137,6 +192,26 @@ parseBinary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
             op = .Plus
         case .Minus:
             op = .Minus
+        case: panic("unreachable")
+        }
+
+        left = makeExpr(left.loc, core.BinaryExpr{left = left, op = op, right = right}) or_return
+    }
+
+    return left, true
+} 
+
+parseMult :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
+    left := parseCall(p) or_return
+
+    bin_op_tokens := [?]tokenizer.TokenKind{ .Star, .Slash }
+    for tok, matches := matchesAny(p, bin_op_tokens[:]);
+            matches;
+            tok, matches = matchesAny(p, bin_op_tokens[:]) {
+        right := parseCall(p) or_return
+
+        op : core.BinOp
+        #partial switch tok {
         case .Star:
             op = .Multiply
         case .Slash:
@@ -149,35 +224,6 @@ parseBinary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
 
     return left, true
 } 
-
-matches :: proc(p: ^Parser, t: tokenizer.TokenKind) -> bool {
-    tok := peek(p)
-    if tok.kind == t {
-        next(p)
-        return true
-    }
-    return false
-}
-
-expect :: proc(p: ^Parser, t: tokenizer.TokenKind, msg: string, args: ..any) -> bool {
-    if matches(p, t) {
-        return true
-    } else {
-        reportError(p, peek(p).loc, msg, ..args)
-        return false
-    }
-}
-
-matchesAny :: proc(p: ^Parser, toks: []tokenizer.TokenKind) -> (tokenizer.TokenKind, bool) {
-    tok := peek(p)
-    for t in toks {
-        if tok.kind == t {
-            next(p)
-            return tok.kind, true
-        }
-    }
-    return {}, false
-}
 
 parseCall :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
     callable := parsePrimary(p) or_return
@@ -203,6 +249,10 @@ parsePrimary :: proc(p: ^Parser) -> (^core.Expr, bool) {
         return makeExpr(tok.loc, core.LiteralExpr(tok.value.(core.Number)))
     case .Ident:
         return makeExpr(tok.loc, core.IdentExpr{name = tok.value.(string)})
+    case .True:
+        return makeExpr(tok.loc, core.LiteralExpr(true))
+    case .False:
+        return makeExpr(tok.loc, core.LiteralExpr(false))
     case:
         reportError(p, tok.loc, "unexpected token '%v'", tok.lexeme)
         return {}, false
@@ -250,3 +300,39 @@ reportError :: proc(p: ^Parser, loc: core.Location, fmt: string, args: ..any) {
     str := strings.concatenate(strs[:], allocator=context.temp_allocator)
     core.printErr(loc, str, ..args)
 }
+
+makeBlockStmt :: proc(loc: core.Location, stmts: []^core.Stmt) -> ^core.Stmt {
+     block, _ := makeStmt(loc, core.BlockStmt{stmts = stmts[:]})
+    return block
+}
+
+matches :: proc(p: ^Parser, t: tokenizer.TokenKind) -> bool {
+    tok := peek(p)
+    if tok.kind == t {
+        next(p)
+        return true
+    }
+    return false
+}
+
+expect :: proc(p: ^Parser, t: tokenizer.TokenKind, msg: string, args: ..any) -> bool {
+    if matches(p, t) {
+        return true
+    } else {
+        reportError(p, peek(p).loc, msg, ..args)
+        return false
+    }
+}
+
+matchesAny :: proc(p: ^Parser, toks: []tokenizer.TokenKind) -> (tokenizer.TokenKind, bool) {
+    tok := peek(p)
+    for t in toks {
+        if tok.kind == t {
+            next(p)
+            return tok.kind, true
+        }
+    }
+    return {}, false
+}
+
+

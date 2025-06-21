@@ -15,6 +15,17 @@ StmtVart :: union {
     AssignStmt,
     BlockStmt,
     FuncStmt,
+    RetStmt,
+    WhileStmt,
+}
+
+WhileStmt :: struct {
+    cond: ^Expr,
+    body: ^Stmt,
+}
+
+RetStmt :: struct {
+    expr: ^Expr,
 }
 
 BlockStmt :: struct {
@@ -24,7 +35,8 @@ BlockStmt :: struct {
 FuncStmt :: struct {
     name: string,
     params: []FuncParam,
-    body: []^Stmt,
+    body: ^Stmt,
+    is_builtin: bool,
 }
 
 CallExpr :: struct {
@@ -52,6 +64,7 @@ IdentExpr :: struct {
 
 LiteralExpr :: union {
     Number,
+    Bool,
 }
 
 BinaryExpr :: struct {
@@ -65,6 +78,12 @@ BinOp :: enum {
     Minus,
     Multiply,
     Divide,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    Equal,
+    NotEqual,
 }
 
 Expr :: struct {

@@ -24,12 +24,21 @@ TokenKind :: enum {
     RightBrace,
     Equal,
     EqualEqual,
+    NotEqual,
     Colon,
     Semicolon,
+    True,
+    False,
     Less,
     Greater,
+    LessEqual,
+    GreaterEqual,
     Var,
+    While,
+    If,
     Comma,
+    Builtin,
+    Return,
     Eof,
 }
 
@@ -57,11 +66,17 @@ makeToken :: proc(t: ^Tokenizer, kind: TokenKind, value: TokenValue = {}) -> (To
 }
 
 makeKeywordsMap :: proc() -> (keywords: map[string]TokenKind) {
+    keywords["if"] = .If
     keywords["def"] = .Def
+    keywords["while"] = .While
+    keywords["return"] = .Return
+    keywords["builtin"] = .Builtin
     keywords["end"] = .End
     keywords["for"] = .For
     keywords["do"] = .Do
     keywords["var"] = .Var
+    keywords["true"] = .True
+    keywords["false"] = .False
     return keywords
 }
 
@@ -204,11 +219,25 @@ nextToken :: proc(t: ^Tokenizer) -> (Token, bool) {
     case '}': return makeToken(t, .RightBrace)
     case ':': return makeToken(t, .Colon)
     case ';': return makeToken(t, .Semicolon)
-    case '<': return makeToken(t, .Less)
-    case '>': return makeToken(t, .Greater)
+    case '!': 
+        if match(t, '=') {
+            return makeToken(t, .NotEqual)
+        }
+    case '<':
+        if match(t, '=') {
+            return makeToken(t, .LessEqual)
+        } else {
+            return makeToken(t, .Less)
+        }
+    case '>':
+        if match(t, '=') {
+            return makeToken(t, .GreaterEqual)
+        } else {
+            return makeToken(t, .Greater)
+        }
     case ',': return makeToken(t, .Comma)
     case '=': 
-        if peekNext(t) == '=' {
+        if match(t, '=') {
             return makeToken(t, .EqualEqual)
         } else {
             return makeToken(t, .Equal)
