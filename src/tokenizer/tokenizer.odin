@@ -280,14 +280,12 @@ readNumber :: proc(t: ^Tokenizer) -> (Token, bool) {
 }
 
 parseNumber :: proc(int_part: string, float_part: string) -> core.Number {
-    ip, ip_ok := strconv.parse_int(int_part)
-    fp, fp_ok := strconv.parse_int(float_part)
+    ip, ip_ok := strconv.parse_i64(int_part)
+    fp, fp_ok := strconv.parse_i64(float_part)
     assert(ip_ok && fp_ok)
-    assert(int(min(i32)) <= ip && ip <= int(max(i32)))
-    assert(int(min(i32)) <= fp && fp <= int(max(i32)))
 
     cnt := fp
-    tens := 1
+    tens : i64 = 1
     for cnt != 0 {
         cnt /= 10
         tens *= 10
@@ -296,10 +294,7 @@ parseNumber :: proc(int_part: string, float_part: string) -> core.Number {
     num := ip * tens + fp
     den := tens
 
-    assert(int(min(i32)) <= num && num <= int(max(i32)))
-    assert(int(min(i32)) <= den && den <= int(max(i32)))
-
-    return {i32(num), i32(den)}
+    return {i64(num), i64(den)}
 }
 
 readIdentifier :: proc(t: ^Tokenizer) -> (Token, bool) {

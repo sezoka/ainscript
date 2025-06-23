@@ -17,6 +17,12 @@ StmtVart :: union {
     FuncStmt,
     RetStmt,
     WhileStmt,
+    IfStmt,
+}
+
+IfStmt :: struct {
+    cond: ^Expr,
+    body: ^Stmt,
 }
 
 WhileStmt :: struct {

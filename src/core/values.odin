@@ -1,8 +1,8 @@
 package aincore
 
 Number :: struct {
-    numeral: i32,
-    denominator: i32,
+    numeral: i64,
+    denominator: i64,
 }
 
 Func :: struct {
@@ -10,6 +10,7 @@ Func :: struct {
     params: []FuncParam,
     body: ^Stmt,
     is_builtin: bool,
+    scope: ^Scope,
 }
 
 FuncParam :: struct {
@@ -19,3 +20,16 @@ FuncParam :: struct {
 Nil :: distinct ^u8
 
 Bool :: bool
+
+Scope :: struct {
+    vars: map[string]Value,
+    ref_count: int,
+    parent: ^Scope,
+}
+
+Value :: union {
+    Number,
+    Func,
+    Nil,
+    Bool,
+}

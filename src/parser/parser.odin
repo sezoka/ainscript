@@ -43,10 +43,20 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
     tok := peek(p)
     loc := tok.loc
 
-    if matches(p, .While) {
+    if matches(p, .If) {
         cond_expr := parseExpr(p) or_return
         block_loc := peek(p).loc
-        expect(p, .Do, "expect 'do' after conditional expression")
+        expect(p, .Do, "expect 'do' after conditional expression") or_return
+        stmts : [dynamic]^core.Stmt
+        for !matches(p, .End) {
+            stmt := parseStmt(p) or_return
+            append(&stmts, stmt)
+        }
+        return makeStmt(loc, core.IfStmt{body = makeBlockStmt(block_loc, stmts[:]), cond = cond_expr}) 
+    } else if matches(p, .While) {
+        cond_expr := parseExpr(p) or_return
+        block_loc := peek(p).loc
+        expect(p, .Do, "expect 'do' after conditional expression") or_return
         stmts : [dynamic]^core.Stmt
         for !matches(p, .End) {
             stmt := parseStmt(p) or_return
@@ -69,7 +79,7 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
 
             params : [dynamic]core.FuncParam
 
-            expect(p, .LeftParen, "expect '(' after function name")
+            expect(p, .LeftParen, "expect '(' after function name") or_return
             for peek(p).kind != .RightParen {
                 param_name_tok := next(p)
                 if param_name_tok.kind == .Ident {
@@ -80,7 +90,7 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
                     return {}, false
                 }
             }
-            expect(p, .RightParen, "expect ')' after function parameters")
+            expect(p, .RightParen, "expect ')' after function parameters") or_return
 
             stmts : [dynamic]^core.Stmt
 
@@ -136,17 +146,43 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
             reportError(p, expr.loc, "expect variable name, but got '%v'", expr.vart)
             return {}, false
         }
-    } if matches(p, .Semicolon) {
+    } else if matches(p, .Semicolon) {
         return makeStmt(expr.loc, core.ExprStmt{ expr = expr })
     }
 
-    reportError(p, expr.loc, "unexpected token '%v'", peek(p).kind)
+    expectSemicolon(p)
+
+    // reportError(p, expr.loc, "unexpected token '%v'", peek(p).kind)
 
     return {}, false
 }
 
 parseExpr :: proc(p: ^Parser) -> (^core.Expr, bool) {
-    return parseLess(p)
+    return parseEqual(p)
+}
+
+parseEqual :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
+    left := parseLess(p) or_return
+
+    bin_op_tokens := [?]tokenizer.TokenKind{ .EqualEqual, .NotEqual }
+    for tok, matches := matchesAny(p, bin_op_tokens[:]);
+            matches;
+            tok, matches = matchesAny(p, bin_op_tokens[:]) {
+        right := parseLess(p) or_return
+
+        op : core.BinOp
+        #partial switch tok {
+        case .EqualEqual:
+            op = .Equal
+        case .NotEqual:
+            op = .NotEqual
+        case: panic("unreachable")
+        }
+
+        left = makeExpr(left.loc, core.BinaryExpr{left = left, op = op, right = right}) or_return
+    }
+
+    return left, true
 }
 
 parseLess :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
@@ -236,7 +272,7 @@ parseCall :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
                 continue
             }
         }
-        expect(p, .RightParen, "expect ')' after call arguments")
+        expect(p, .RightParen, "expect ')' after call arguments") or_return
         return makeExpr(callable.loc, core.CallExpr{callable=callable, args=args[:]})
     }
     return callable, true
@@ -315,6 +351,7 @@ matches :: proc(p: ^Parser, t: tokenizer.TokenKind) -> bool {
     return false
 }
 
+@(require_results)
 expect :: proc(p: ^Parser, t: tokenizer.TokenKind, msg: string, args: ..any) -> bool {
     if matches(p, t) {
         return true

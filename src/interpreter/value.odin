@@ -3,38 +3,39 @@ package aininterpreter
 import "../core"
 import "core:fmt"
 
-Value :: union {
-    core.Number,
-    core.Func,
-    core.Nil,
-    core.Bool,
-}
-
-makeValue_Number :: proc(n: core.Number) -> Value {
+makeValue_Number :: proc(n: core.Number) -> core.Value {
     return n
 }
 
-makeValue_Bool :: proc(v: bool) -> Value {
+makeValue_Bool :: proc(v: bool) -> core.Value {
     return v
 }
 
-makeValue_Nil :: proc() -> Value {
+makeValue_Nil :: proc() -> core.Value {
     return core.Nil(nil)
 }
 
 makeValue_Func :: proc(name: string,
     params: []core.FuncParam,
     body: ^core.Stmt,
+    scope: ^core.Scope,
     is_builtin := false,
-) -> Value {
-    return core.Func{ name, params, body, is_builtin }
+) -> core.Value {
+    return core.Func{ 
+        name = name,
+        params = params,
+        body = body,
+        is_builtin = is_builtin,
+        scope = scope
+    }
 }
 
-printValue :: proc(val: Value) {
+printValue :: proc(val: core.Value) {
     switch v in val {
     case core.Number:
         num := normalizeNumber(v)
-        fmt.printfln("%v/%v", num.numeral, num.denominator)
+        float := f64(num.numeral) / f64(num.denominator)
+        fmt.println(float)
     case core.Func:
         fmt.printfln("func(%s)%v", v.name, v.params)
     case core.Nil:
@@ -46,7 +47,11 @@ printValue :: proc(val: Value) {
 
 normalizeNumber :: proc(v: core.Number) -> core.Number {
     gcd := core.gcd(v.numeral, v.denominator)
-    numeral := v.numeral / gcd
-    denominator := v.denominator / gcd
-    return {numeral, denominator}
+    if gcd == 0 {
+        return v
+    } else {
+        numeral := v.numeral / gcd
+        denominator := v.denominator / gcd
+        return {numeral, denominator}
+    }
 }
