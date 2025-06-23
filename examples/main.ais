@@ -14,6 +14,14 @@ def variables()
     end
 end
 
+def factorial(n)
+    if n == 1 do
+        return 1;
+    end 
+
+    return n * factorial(n - 1);
+end
+
 def functions()
     def noArguments()
         return 123;
@@ -21,14 +29,6 @@ def functions()
 
     def withArguments(a b c)
         return a + b + c;
-    end
-
-    def factorial(n)
-        if n == 1 do
-            return 1;
-        end 
-
-        return n * factorial(n - 1);
     end
 
     def fib(n)
@@ -39,13 +39,19 @@ def functions()
     end
 
     def varArgsFunc(a b ..rest)
+        return rest;
     end
 
     print(noArguments());
     print(withArguments(1, 2, 3));
     print(factorial(5));
     print(fib(10));
-    print(varArgsFunc(1, 2));
+    print(varArgsFunc(1, 2, 3)); // TODO
+end
+
+def arrays()
+    arr := {1, 2, factorial(5), 4, 5, 6};
+    print(arr);
 end
 
 def closure()
@@ -77,6 +83,7 @@ def main()
     functions();
     closure();
     strings();
+    arrays();
 end
 
 main();

@@ -34,6 +34,11 @@ Value :: union {
     Nil,
     Bool,
     String,
+    Array,
+}
+
+Array :: struct {
+    values: [dynamic]Value,
 }
 
 String :: distinct string

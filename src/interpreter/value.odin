@@ -3,6 +3,10 @@ package aininterpreter
 import "../core"
 import "core:fmt"
 
+makeValue_Array :: proc(values: [dynamic]core.Value) -> core.Value {
+    return core.Array{values=values}
+}
+
 makeValue_Number :: proc(n: core.Number) -> core.Value {
     return n
 }
@@ -32,18 +36,25 @@ makeValue_Func :: proc(name: string,
 
 printValue :: proc(val: core.Value) {
     switch v in val {
+    case core.Array:
+        fmt.print("{ ")
+        for value in v.values {
+            printValue(value)
+            fmt.print(", ")
+        }
+        fmt.print("}")
     case core.String:
-        fmt.println(v)
+        fmt.print(v)
     case core.Number:
         num := normalizeNumber(v)
         float := f64(num.numeral) / f64(num.denominator)
-        fmt.println(float)
+        fmt.print(float)
     case core.Func:
-        fmt.printfln("func(%s)%v", v.name, v.params)
+        fmt.printf("func(%s)%v", v.name, v.params)
     case core.Nil:
-        fmt.println("nil")
+        fmt.print("nil")
     case core.Bool:
-        fmt.println(v)
+        fmt.print(v)
     }
 }
 

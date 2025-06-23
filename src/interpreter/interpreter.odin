@@ -216,6 +216,12 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
         return findVar(intr, expr.loc, e.name)
     case core.LiteralExpr:
         switch lit_expr in e {
+        case core.ArrayExpr:
+            values : [dynamic]core.Value
+            for value in lit_expr.values {
+                append(&values, interpretExpr(intr, value) or_return)
+            }
+            return makeValue_Array(values), true
         case core.String:
             return lit_expr, true 
         case core.Number:
@@ -252,6 +258,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                     if func.name == "print" {
                         val := currScope(intr).vars["val"]
                         printValue(val)
+                        fmt.println()
                         return makeValue_Nil(), true
                     } else if func.name == "timestamp" {
                         numeral : i64 = time.to_unix_nanoseconds(time.now())

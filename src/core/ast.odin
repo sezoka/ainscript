@@ -72,6 +72,11 @@ LiteralExpr :: union {
     String,
     Number,
     Bool,
+    ArrayExpr,
+}
+
+ArrayExpr :: struct {
+    values: []^Expr,
 }
 
 BinaryExpr :: struct {

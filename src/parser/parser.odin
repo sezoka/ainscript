@@ -287,7 +287,7 @@ parseCall :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
     return callable, true
 }
 
-parsePrimary :: proc(p: ^Parser) -> (^core.Expr, bool) {
+parsePrimary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
     tok := next(p)
     #partial switch tok.kind {
     case .Number:
@@ -300,6 +300,18 @@ parsePrimary :: proc(p: ^Parser) -> (^core.Expr, bool) {
         return makeExpr(tok.loc, core.LiteralExpr(false))
     case .String:
         return makeExpr(tok.loc, core.LiteralExpr(core.String(tok.value.(string))))
+    case .LeftBrace:
+        values : [dynamic]^core.Expr
+        for peek(p).kind != .RightBrace {
+            val := parseExpr(p) or_return
+            append(&values, val)
+            if matches(p, .Comma) {
+                continue
+            }
+        }
+        expect(p, .RightBrace, "expect '}' after array values") or_return
+        shrink(&values)
+        return makeExpr(tok.loc, core.LiteralExpr(core.ArrayExpr{values=values[:]}))
     case:
         reportError(p, tok.loc, "unexpected token '%v'", tok.lexeme)
         return {}, false
