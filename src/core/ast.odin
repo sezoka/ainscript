@@ -69,6 +69,7 @@ IdentExpr :: struct {
 }
 
 LiteralExpr :: union {
+    String,
     Number,
     Bool,
 }
@@ -103,4 +104,3 @@ ExprVart :: union {
     IdentExpr,
     CallExpr,
 }
-

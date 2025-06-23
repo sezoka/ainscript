@@ -216,6 +216,8 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
         return findVar(intr, expr.loc, e.name)
     case core.LiteralExpr:
         switch lit_expr in e {
+        case core.String:
+            return lit_expr, true 
         case core.Number:
             return lit_expr, true
         case core.Bool: 

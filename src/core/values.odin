@@ -32,4 +32,7 @@ Value :: union {
     Func,
     Nil,
     Bool,
+    String,
 }
+
+String :: distinct string

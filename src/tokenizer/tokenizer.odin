@@ -8,38 +8,40 @@ import "core:strings"
 import "core:fmt"
 
 TokenKind :: enum {
-    Number,
-    Plus,
-    Minus,
-    Star,
-    Slash,
+    Block,
+    Builtin,
+    Colon,
+    Comma,
     Def,
-    End,
-    For,
     Do,
-    Ident,
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
+    End,
+    Eof,
     Equal,
     EqualEqual,
-    NotEqual,
-    Colon,
-    Semicolon,
-    True,
     False,
-    Less,
+    For,
     Greater,
-    LessEqual,
     GreaterEqual,
-    Var,
-    While,
+    Ident,
     If,
-    Comma,
-    Builtin,
+    LeftBrace,
+    LeftParen,
+    Less,
+    LessEqual,
+    Minus,
+    NotEqual,
+    Number,
+    Plus,
     Return,
-    Eof,
+    RightBrace,
+    RightParen,
+    Semicolon,
+    Slash,
+    Star,
+    String,
+    True,
+    ColonEqual,
+    While,
 }
 
 TokenValue :: union {
@@ -68,13 +70,13 @@ makeToken :: proc(t: ^Tokenizer, kind: TokenKind, value: TokenValue = {}) -> (To
 makeKeywordsMap :: proc() -> (keywords: map[string]TokenKind) {
     keywords["if"] = .If
     keywords["def"] = .Def
+    keywords["block"] = .Block
     keywords["while"] = .While
     keywords["return"] = .Return
     keywords["builtin"] = .Builtin
     keywords["end"] = .End
     keywords["for"] = .For
     keywords["do"] = .Do
-    keywords["var"] = .Var
     keywords["true"] = .True
     keywords["false"] = .False
     return keywords
@@ -217,7 +219,12 @@ nextToken :: proc(t: ^Tokenizer) -> (Token, bool) {
     case ')': return makeToken(t, .RightParen)
     case '{': return makeToken(t, .LeftBrace)
     case '}': return makeToken(t, .RightBrace)
-    case ':': return makeToken(t, .Colon)
+    case ':': 
+        if match(t, '=') {
+            return makeToken(t, .ColonEqual)
+        } else {
+            return makeToken(t, .Colon)
+        }
     case ';': return makeToken(t, .Semicolon)
     case '!': 
         if match(t, '=') {
@@ -250,12 +257,31 @@ nextToken :: proc(t: ^Tokenizer) -> (Token, bool) {
         if isDigit(c) {
             return readNumber(t)
         }
+        if c == '"' {
+            return readString(t)
+        }
         reportError(t, "unexpected character '%c'", c)
         return {}, false
     }
     }
 
     return {}, false
+}
+
+readString :: proc(t: ^Tokenizer) -> (Token, bool) {
+    for peek(t) != '"' && peek(t) != 0 {
+        advance(t)
+    }
+    if peek(t) == 0 {
+        reportError(t, "unenclosed string at %d:%d", t.curr_token_loc.line, t.curr_token_loc.col)
+        return {}, false
+    }
+    advance(t);
+
+    string_lex := getLexeme(t)
+    string := string_lex[1:len(string_lex)-1]
+    
+    return makeToken(t, .String, string)
 }
 
 readNumber :: proc(t: ^Tokenizer) -> (Token, bool) {

@@ -110,33 +110,27 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
             reportError(p, loc, "expect variable name, but got '%v'", maybe_ident_tok.lexeme)
             return {}, false
         }
-    } else if matches(p, .LeftBrace) {
+    } else if matches(p, .Block) {
         stmts : [dynamic]^core.Stmt
-        for !matches(p, .RightBrace) {
+        for !matches(p, .End) {
             append(&stmts, parseStmt(p) or_return)
         }
         return makeStmt(loc, core.BlockStmt{stmts = stmts[:]})
-    } else if matches(p, .Var) {
-        ident_expr := parseExpr(p) or_return
-        ident, is_ident := ident_expr.vart.(core.IdentExpr)
-        if is_ident {
-            if matches(p, .Equal) {
-                val := parseExpr(p) or_return
-                expectSemicolon(p) or_return
-                return makeStmt(ident_expr.loc, core.VarStmt{name = ident.name, value = val})
-            } else {
-                reportError(p, ident_expr.loc, "expect '=' after variable name")
-                return {}, false
-            }
-        } else {
-            reportError(p, ident_expr.loc, "expect variable name, but got '%v'", ident_expr.vart)
-            return {}, false
-        }
-    }
+    } 
 
     expr := parseExpr(p) or_return
 
-    if matches(p, .Equal) {
+    if matches(p, .ColonEqual) {
+        ident, is_ident := expr.vart.(core.IdentExpr)
+        if is_ident {
+            val := parseExpr(p) or_return
+            expectSemicolon(p) or_return
+            return makeStmt(expr.loc, core.VarStmt{name = ident.name, value = val})
+        } else {
+            reportError(p, expr.loc, "expect variable name, but got '%v'", expr.vart)
+            return {}, false
+        }
+    } else if matches(p, .Equal) {
         ident, is_ident := expr.vart.(core.IdentExpr)
         if is_ident {
             val := parseExpr(p) or_return
@@ -289,6 +283,8 @@ parsePrimary :: proc(p: ^Parser) -> (^core.Expr, bool) {
         return makeExpr(tok.loc, core.LiteralExpr(true))
     case .False:
         return makeExpr(tok.loc, core.LiteralExpr(false))
+    case .String:
+        return makeExpr(tok.loc, core.LiteralExpr(core.String(tok.value.(string))))
     case:
         reportError(p, tok.loc, "unexpected token '%v'", tok.lexeme)
         return {}, false

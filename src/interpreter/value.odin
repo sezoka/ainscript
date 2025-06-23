@@ -32,6 +32,8 @@ makeValue_Func :: proc(name: string,
 
 printValue :: proc(val: core.Value) {
     switch v in val {
+    case core.String:
+        fmt.println(v)
     case core.Number:
         num := normalizeNumber(v)
         float := f64(num.numeral) / f64(num.denominator)
