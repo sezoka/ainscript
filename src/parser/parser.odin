@@ -80,13 +80,28 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
             params : [dynamic]core.FuncParam
 
             expect(p, .LeftParen, "expect '(' after function name") or_return
+
+            handled_rest_param := false
+            rest_param_loc : core.Location
             for peek(p).kind != .RightParen {
-                param_name_tok := next(p)
-                if param_name_tok.kind == .Ident {
-                    param_name := param_name_tok.value.(string)
+                maybe_param_name_tok := next(p)
+                if maybe_param_name_tok.kind == .Ident {
+                    if handled_rest_param {
+                        reportError(p, rest_param_loc, "rest parameter must be latest", )
+                        return {}, false
+                    }
+                    param_name := maybe_param_name_tok.value.(string)
                     append(&params, core.FuncParam{name=param_name})
+                } else if maybe_param_name_tok.kind == .DotDot {
+                    maybe_param_name_tok := next(p)
+                    rest_param_loc = maybe_param_name_tok.loc
+                    if maybe_param_name_tok.kind == .Ident {
+                        param_name := maybe_param_name_tok.value.(string)
+                        handled_rest_param = true
+                        append(&params, core.FuncParam{name=param_name, is_rest=true})
+                    }
                 } else {
-                    reportError(p, loc, "expect param name, but got '%v'", param_name_tok.lexeme)
+                    reportError(p, loc, "expect param name, but got '%v'", maybe_param_name_tok.lexeme)
                     return {}, false
                 }
             }

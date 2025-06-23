@@ -15,6 +15,7 @@ Func :: struct {
 
 FuncParam :: struct {
     name: string,
+    is_rest: bool,
 }
 
 Nil :: distinct ^u8

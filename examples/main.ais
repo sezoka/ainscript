@@ -10,6 +10,7 @@ def variables()
 
     block
         x := 2;
+        print(x);
     end
 end
 
@@ -37,10 +38,14 @@ def functions()
         return fib(n - 1) + fib(n - 2);
     end
 
+    def varArgsFunc(a b ..rest)
+    end
+
     print(noArguments());
     print(withArguments(1, 2, 3));
     print(factorial(5));
     print(fib(10));
+    print(varArgsFunc(1, 2));
 end
 
 def closure()

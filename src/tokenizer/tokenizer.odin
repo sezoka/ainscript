@@ -41,6 +41,8 @@ TokenKind :: enum {
     String,
     True,
     ColonEqual,
+    Dot,
+    DotDot,
     While,
 }
 
@@ -224,6 +226,12 @@ nextToken :: proc(t: ^Tokenizer) -> (Token, bool) {
             return makeToken(t, .ColonEqual)
         } else {
             return makeToken(t, .Colon)
+        }
+    case '.': 
+        if match(t, '.') {
+            return makeToken(t, .DotDot)
+        } else {
+            return makeToken(t, .Dot)
         }
     case ';': return makeToken(t, .Semicolon)
     case '!': 
