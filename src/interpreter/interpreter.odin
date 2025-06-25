@@ -307,14 +307,18 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 }
 
                 if func.is_builtin {
-                    if func.name == "print" {
+                    if func.name == "println" || func.name == "print" {
                         val := currScope(intr).vars["val"]
                         val_arr := val.(core.Array)
-                        for val in val_arr.values {
+                        for val, i in val_arr.values {
                             printValue(val)
-                            fmt.print(" ")
+                            if i != len(val_arr.values) - 1 {
+                                fmt.print(" ")
+                            }
                         }
-                        fmt.println()
+                        if func.name == "println" {
+                            fmt.println()
+                        }
                         return makeValue_Nil(), true
                     } else if func.name == "timestamp" {
                         numeral : i64 = time.to_unix_nanoseconds(time.now())
