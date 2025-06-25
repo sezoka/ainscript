@@ -54,7 +54,7 @@ def arrays()
     print(arr);
     access := arr[2];
     print(access);
-    access2 := {0, 1, 2}[2];
+    access2 := {0, 1, 69, 3}[+-+-3];
     print(access2);
 end
 

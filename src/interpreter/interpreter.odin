@@ -195,10 +195,14 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 indexable := interpretExpr(intr, e.indexable) or_return
                 arr, is_arr := indexable.(core.Array)
                 if is_arr {
-                    indexed_value := arr.values[index]
-                    return indexed_value, true
+                    if int(index) < len(arr.values) {
+                        indexed_value := arr.values[index]
+                        return indexed_value, true
+                    } else {
+                        reportError(e.index.loc, "index out of bounds: array length == '%v', index == '%v'", len(arr.values), index) or_return
+                    }
                 } else {
-                    reportError(e.indexable.loc, "can index only inside arrays", index) or_return
+                    reportError(e.indexable.loc, "can index only inside arrays") or_return
                 }
             } else {
                 reportError(e.index.loc, "index should be a positive number, but got '%d'", index) or_return
