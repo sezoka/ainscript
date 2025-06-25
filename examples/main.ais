@@ -2,6 +2,9 @@ builtin println(..val) end
 builtin print(..val) end
 builtin timestamp() end
 
+builtin loadLibrary(path) end
+builtin unloadLibrary(lib_ptr) end
+
 def variables()
     println("VARIABLES");
     number := 123.456;
@@ -85,12 +88,35 @@ def strings()
     println(str);
 end
 
+def structs()
+    def Color(r g b a)
+        return #{
+            r = r,
+            g = g,
+            b = b,
+            a = a,
+        };
+    end
+
+    color := Color(100, 200, 123, 255);
+
+    print("color", color);
+end
+
+def raylibExample()
+    raylib := loadLibrary("/usr/lib/libraylib.so");
+    print(raylib);
+    unloadLibrary(raylib);
+end
+
 def main()
     variables();
     functions();
     closure();
     strings();
     arrays();
+    structs();
+    raylibExample();
 end
 
 main();

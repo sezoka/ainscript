@@ -31,6 +31,7 @@ TokenKind :: enum {
     Less,
     LessEqual,
     Minus,
+    Bang,
     NotEqual,
     Number,
     Plus,
@@ -46,6 +47,7 @@ TokenKind :: enum {
     Dot,
     DotDot,
     While,
+    SharpBrace,
 }
 
 TokenValue :: union {
@@ -241,6 +243,11 @@ nextToken :: proc(t: ^Tokenizer) -> (Token, bool) {
     case '!': 
         if match(t, '=') {
             return makeToken(t, .NotEqual)
+        }
+        return makeToken(t, .Bang)
+    case '#':
+        if match(t, '{') {
+            return makeToken(t, .SharpBrace)
         }
     case '<':
         if match(t, '=') {

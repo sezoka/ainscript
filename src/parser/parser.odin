@@ -338,6 +338,29 @@ parsePrimary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
         expect(p, .RightBrace, "expect '}' after array values") or_return
         shrink(&values)
         return makeExpr(tok.loc, core.LiteralExpr(core.ArrayExpr{values=values[:]}))
+    case .SharpBrace:
+        fields: [dynamic]core.StructFieldExpr
+
+        for !matches(p, .RightBrace) {
+            maybe_ident_tok := next(p)
+            if maybe_ident_tok.kind == .Ident {
+                name := maybe_ident_tok.value.(string)
+                expect(p, .Equal, "expect '=' after field name") or_return
+                value := parseExpr(p) or_return
+                append(&fields, core.StructFieldExpr{name = name, value=value})
+            } else {
+                reportError(p, maybe_ident_tok.loc, "expect struct field name, but got %v", maybe_ident_tok.kind)
+                return {}, false
+            }
+
+            if matches(p, .Comma) {
+                continue
+            }
+        }
+
+        shrink(&fields)
+
+        return makeExpr(tok.loc, core.StructExpr{fields=fields[:]})
     case:
         reportError(p, tok.loc, "unexpected token '%v'", tok.lexeme)
         return {}, false

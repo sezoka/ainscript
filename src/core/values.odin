@@ -35,6 +35,8 @@ Value :: union {
     Bool,
     String,
     Array,
+    Struct,
+    rawptr,
 }
 
 Array :: struct {
@@ -42,3 +44,12 @@ Array :: struct {
 }
 
 String :: distinct string
+
+StructField :: struct {
+    name: string,
+    value: Value,
+}
+
+Struct :: struct {
+    fields: []StructField,
+}

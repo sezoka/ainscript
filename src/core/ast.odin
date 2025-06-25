@@ -126,4 +126,14 @@ ExprVart :: union {
     CallExpr,
     IndexExpr,
     UnaryExpr,
+    StructExpr,
+}
+
+StructExpr :: struct {
+    fields: []StructFieldExpr,
+}
+
+StructFieldExpr :: struct {
+    name: string,
+    value: ^Expr,
 }

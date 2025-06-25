@@ -5,6 +5,7 @@ import "core:log"
 import "core:fmt"
 import "core:time"
 import "core:strings"
+import "core:dynlib"
 
 Interpreter :: struct {
     // scopes: [dynamic]core.Scope,
@@ -166,6 +167,13 @@ currScopeInc :: proc(intr: ^Interpreter) -> ^core.Scope {
 
 interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value, ok: bool) {
     switch e in expr.vart {
+    case core.StructExpr:
+        fields := make([]core.StructField, len(e.fields))
+        for i in 0..<len(fields) {
+            fields[i].name = e.fields[i].name
+            fields[i].value = interpretExpr(intr, e.fields[i].value) or_return
+        }
+        return makeValue_Struct(fields), true
     case core.UnaryExpr:
         val := interpretExpr(intr, e.expr) or_return
         switch e.op {
@@ -323,6 +331,24 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                     } else if func.name == "timestamp" {
                         numeral : i64 = time.to_unix_nanoseconds(time.now())
                         return core.Number{numeral, 1}, true
+                    } else  if func.name == "loadLibrary" {
+                        path := currScope(intr).vars["path"]
+                        path_str, is_str := path.(core.String)
+                        if is_str {
+                            lib := loadLibrary(e.callable.loc, string(path_str)) or_return
+                            return makeValue_Pointer(rawptr(lib)), true
+                        } else {
+                            reportError(e.callable.loc, "builtin 'loadLibrary' expects library path as string") or_return
+                        }
+                    } else  if func.name == "unloadLibrary" {
+                        lib_ptr := currScope(intr).vars["lib_ptr"]
+                        ptr, is_ptr := lib_ptr.(rawptr)
+                        if is_ptr {
+                            dynlib.unload_library(dynlib.Library(ptr)) or_return
+                            return makeValue_Nil(), true
+                        } else {
+                            reportError(e.callable.loc, "builtin 'unloadLibrary' expects library pointer") or_return
+                        }
                     } else {
                         log.error("unhandled")
                         return {}, false
