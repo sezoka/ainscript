@@ -272,7 +272,12 @@ parseMult :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
 
 parseCall :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
     callable := parsePrimary(p) or_return
-    if matches(p, .LeftParen) {
+
+    if matches(p, .LeftBracket) {
+        index_expr := parseExpr(p) or_return;
+        expect(p, .RightBracket, "expect ']' after index expression") or_return
+        return makeExpr(callable.loc, core.IndexExpr{indexable=callable, index=index_expr})
+    } else if matches(p, .LeftParen) {
         args : [dynamic]^core.Expr
         for peek(p).kind != .RightParen {
             arg := parseExpr(p) or_return

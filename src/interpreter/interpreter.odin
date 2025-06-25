@@ -69,8 +69,7 @@ findScopeThatHasVar :: proc(intr: ^Interpreter, var_name: string) -> ^core.Scope
 defineVariable :: proc(intr: ^Interpreter, loc: core.Location, name: string, val: core.Value) -> bool {
     is_exists := findScopeThatHasVar(intr, name) == currScope(intr)
     if is_exists {
-        reportError(loc, "variable with name '%s' already exists", name)
-        return false
+        reportError(loc, "variable with name '%s' already exists", name) or_return
     }
     scope := currScope(intr)
     scope.vars[name] = val
@@ -83,19 +82,18 @@ assignVariable :: proc(intr: ^Interpreter, loc: core.Location, name: string, val
         scope.vars[name] = val
         return true
     } else {
-        reportError(loc, "variable with name '%s' is not defined", name)
-        return false
+        return reportError(loc, "variable with name '%s' is not defined", name)
     }
 }
 
-findVar :: proc(intr: ^Interpreter, loc: core.Location, name: string) -> (core.Value, bool) {
+findVar :: proc(intr: ^Interpreter, loc: core.Location, name: string) -> (val: core.Value, ok: bool) {
     scope := findScopeThatHasVar(intr, name)
     if scope != nil {
         return scope.vars[name], true
     } else {
-        reportError(loc, "variable with name '%s' is not defined", name)
-        return {}, false
+        reportError(loc, "variable with name '%s' is not defined", name) or_return
     }
+    return
 }
 
 @(require_results)
@@ -111,8 +109,7 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
                 break
             }
         } else {
-            reportError(v.cond.loc, "expect bool as conditional value, but got: '%v'", cond_res)
-            return false
+            reportError(v.cond.loc, "expect bool as conditional value, but got: '%v'", cond_res) or_return
         }
     case core.WhileStmt:
         for {
@@ -125,8 +122,7 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
                     break
                 }
             } else {
-                reportError(v.cond.loc, "expect bool as conditional value, but got: '%v'", cond_res)
-                return false
+                reportError(v.cond.loc, "expect bool as conditional value, but got: '%v'", cond_res) or_return
             }
         }
     case core.RetStmt:
@@ -170,6 +166,26 @@ currScopeInc :: proc(intr: ^Interpreter) -> ^core.Scope {
 
 interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value, ok: bool) {
     switch e in expr.vart {
+    case core.IndexExpr:
+        index_val := interpretExpr(intr, e.index) or_return
+        number, is_number := index_val.(core.Number)
+        if is_number {
+            index := number.numeral / number.denominator
+            if 0 <= index {
+                indexable := interpretExpr(intr, e.indexable) or_return
+                arr, is_arr := indexable.(core.Array)
+                if is_arr {
+                    indexed_value := arr.values[index]
+                    return indexed_value, true
+                } else {
+                    reportError(e.indexable.loc, "can index only inside arrays", index) or_return
+                }
+            } else {
+                reportError(e.index.loc, "index should be a positive number, but got %d", index) or_return
+            }
+        } else {
+            reportError(e.index.loc, "index expression should evaluate to a number, but got %v", index_val) or_return
+        }
     case core.BinaryExpr:
         left := interpretExpr(intr, e.left) or_return
         right := interpretExpr(intr, e.right) or_return
@@ -209,8 +225,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 return makeValue_Bool(a.numeral * b.denominator != b.numeral * a.denominator), true
             }
         } else {
-            reportError(expr.loc, "operator %v expects number operands, but got '%v' and '%v'", e.op, a, b)
-            return {}, false
+            reportError(expr.loc, "operator %v expects number operands, but got '%v' and '%v'", e.op, a, b) or_return
         }
     case core.IdentExpr:
         return findVar(intr, expr.loc, e.name)
@@ -284,12 +299,10 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
             } else {
                 reportError(expr.loc,
                     "number of function params and passed arguments don't match: '%d' vs '%d'",
-                    len(func.params), len(e.args))
-                return {}, false
+                    len(func.params), len(e.args)) or_return
             }
         } else {
-            reportError(expr.loc, "can call only function expressions, but got '%v'", maybe_func)
-            return {}, false
+            reportError(expr.loc, "can call only function expressions, but got '%v'", maybe_func) or_return
         }
     }
 
@@ -307,9 +320,11 @@ printScopes :: proc(intr: ^Interpreter) {
     fmt.println("END")
 }
 
-reportError :: proc(loc: core.Location, fmt: string, args: ..any) {
+@(require_results)
+reportError :: proc(loc: core.Location, fmt: string, args: ..any) -> bool {
     // p.had_error = true
     strs : [2]string = { "Interpreter: ", fmt }
     str := strings.concatenate(strs[:], allocator=context.temp_allocator)
     core.printErr(loc, str, ..args)
+    return false
 }

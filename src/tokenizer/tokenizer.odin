@@ -26,6 +26,8 @@ TokenKind :: enum {
     If,
     LeftBrace,
     LeftParen,
+    LeftBracket,
+    RightBracket,
     Less,
     LessEqual,
     Minus,
@@ -221,6 +223,8 @@ nextToken :: proc(t: ^Tokenizer) -> (Token, bool) {
     case ')': return makeToken(t, .RightParen)
     case '{': return makeToken(t, .LeftBrace)
     case '}': return makeToken(t, .RightBrace)
+    case '[': return makeToken(t, .LeftBracket)
+    case ']': return makeToken(t, .RightBracket)
     case ':': 
         if match(t, '=') {
             return makeToken(t, .ColonEqual)

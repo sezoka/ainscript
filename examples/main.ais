@@ -52,6 +52,10 @@ end
 def arrays()
     arr := {1, 2, factorial(5), 4, 5, 6};
     print(arr);
+    access := arr[2];
+    print(access);
+    access2 := {0, 1, 2}[2];
+    print(access2);
 end
 
 def closure()

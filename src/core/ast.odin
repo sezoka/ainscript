@@ -45,6 +45,11 @@ FuncStmt :: struct {
     is_builtin: bool,
 }
 
+IndexExpr :: struct {
+    indexable: ^Expr,
+    index: ^Expr,
+}
+
 CallExpr :: struct {
     callable: ^Expr,
     args: []^Expr,
@@ -108,4 +113,5 @@ ExprVart :: union {
     BinaryExpr,
     IdentExpr,
     CallExpr,
+    IndexExpr,
 }
