@@ -84,11 +84,22 @@ ArrayExpr :: struct {
     values: []^Expr,
 }
 
+UnaryExpr :: struct {
+    expr: ^Expr,
+    op: UnaryOp,
+}
+
+UnaryOp :: enum {
+    Negate,
+    Identity,
+}
+
 BinaryExpr :: struct {
     left: ^Expr,
     op: BinOp,
     right: ^Expr,
 }
+
 
 BinOp :: enum {
     Plus,
@@ -114,4 +125,5 @@ ExprVart :: union {
     IdentExpr,
     CallExpr,
     IndexExpr,
+    UnaryExpr,
 }

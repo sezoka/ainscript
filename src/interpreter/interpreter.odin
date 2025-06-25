@@ -166,6 +166,26 @@ currScopeInc :: proc(intr: ^Interpreter) -> ^core.Scope {
 
 interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value, ok: bool) {
     switch e in expr.vart {
+    case core.UnaryExpr:
+        val := interpretExpr(intr, e.expr) or_return
+        switch e.op {
+        case .Identity:
+            num, is_num := val.(core.Number)
+            if is_num {
+                return num, true
+            } else {
+                reportError(expr.loc, "can use unary expession '+' only on numbers") or_return
+            }
+        case .Negate:
+            num, is_num := val.(core.Number)
+            if is_num {
+                negated := num
+                num.numeral = -num.numeral
+                return makeValue_Number(num), true
+            } else {
+                reportError(expr.loc, "can use unary expession '-' only on numbers") or_return
+            }
+        }
     case core.IndexExpr:
         index_val := interpretExpr(intr, e.index) or_return
         number, is_number := index_val.(core.Number)
@@ -181,10 +201,10 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                     reportError(e.indexable.loc, "can index only inside arrays", index) or_return
                 }
             } else {
-                reportError(e.index.loc, "index should be a positive number, but got %d", index) or_return
+                reportError(e.index.loc, "index should be a positive number, but got '%d'", index) or_return
             }
         } else {
-            reportError(e.index.loc, "index expression should evaluate to a number, but got %v", index_val) or_return
+            reportError(e.index.loc, "index expression should evaluate to a number, but got '%v'", index_val) or_return
         }
     case core.BinaryExpr:
         left := interpretExpr(intr, e.left) or_return

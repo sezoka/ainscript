@@ -247,13 +247,13 @@ parseSum :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
 } 
 
 parseMult :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
-    left := parseCall(p) or_return
+    left := parseUnary(p) or_return
 
     bin_op_tokens := [?]tokenizer.TokenKind{ .Star, .Slash }
     for tok, matches := matchesAny(p, bin_op_tokens[:]);
             matches;
             tok, matches = matchesAny(p, bin_op_tokens[:]) {
-        right := parseCall(p) or_return
+        right := parseUnary(p) or_return
 
         op : core.BinOp
         #partial switch tok {
@@ -269,6 +269,27 @@ parseMult :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
 
     return left, true
 } 
+
+parseUnary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
+    unary_op_tokens := [?]tokenizer.TokenKind{ .Minus, .Plus }
+    if tok, matches := matchesAny(p, unary_op_tokens[:]); matches {
+        expr := parseUnary(p) or_return
+
+        op : core.UnaryOp
+        #partial switch tok {
+        case .Minus:
+            op = .Negate
+        case .Plus:
+            op = .Identity
+        case: panic("unreachable")
+        }
+
+        expr = makeExpr(expr.loc, core.UnaryExpr{expr = expr, op = op}) or_return
+        return expr, true
+    }
+
+    return parseCall(p)
+}
 
 parseCall :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
     callable := parsePrimary(p) or_return
