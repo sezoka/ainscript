@@ -1,4 +1,4 @@
-builtin print(val) end
+builtin print(..val) end
 builtin timestamp() end
 
 def variables()
@@ -39,6 +39,7 @@ def functions()
     end
 
     def varArgsFunc(a b ..rest)
+        print("varargs:", a, b, rest);
         return rest;
     end
 
@@ -46,7 +47,7 @@ def functions()
     print(withArguments(1, 2, 3));
     print(factorial(5));
     print(fib(10));
-    print(varArgsFunc(1, 2, 3)); // TODO
+    print(varArgsFunc(1, 2, 3, 4, 5, 6)); // TODO
 end
 
 def arrays()

@@ -38,9 +38,12 @@ printValue :: proc(val: core.Value) {
     switch v in val {
     case core.Array:
         fmt.print("{ ")
-        for value in v.values {
+        for value, i in v.values {
             printValue(value)
-            fmt.print(", ")
+            if i != len(v.values) - 1 {
+                fmt.print(",")
+            }
+            fmt.print(" ")
         }
         fmt.print("}")
     case core.String:

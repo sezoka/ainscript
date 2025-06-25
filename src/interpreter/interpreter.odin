@@ -273,13 +273,26 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
         func, is_func := maybe_func.(core.Func)
 
         if is_func {
-            if len(func.params) == len(e.args) {
+            has_rest_param := len(func.params) != 0 && func.params[len(func.params)-1].is_rest
+            if len(func.params) == len(e.args) || (has_rest_param && len(func.params) <= len(e.args)) {
                 // eval args
                 args := make([dynamic]core.Value, len(func.params))
                 defer delete(args)
-                for i in 0..<len(func.params) {
+
+                params_len := has_rest_param ? len(func.params) - 1 : len(func.params)
+                for i in 0..<params_len {
                     arg := interpretExpr(intr, e.args[i]) or_return
                     args[i] = arg
+                }
+                if has_rest_param {
+                    rest_args_len := len(e.args) - params_len
+                    rest_args := make([dynamic]core.Value, rest_args_len)
+                    for i in 0..<rest_args_len {
+                        arg := interpretExpr(intr, e.args[i + params_len]) or_return
+                        rest_args[i] = arg
+                    }
+                    rest_arr := makeValue_Array(rest_args)
+                    args[len(func.params) - 1] = rest_arr
                 }
 
                 // create new scope
@@ -296,7 +309,11 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 if func.is_builtin {
                     if func.name == "print" {
                         val := currScope(intr).vars["val"]
-                        printValue(val)
+                        val_arr := val.(core.Array)
+                        for val in val_arr.values {
+                            printValue(val)
+                            fmt.print(" ")
+                        }
                         fmt.println()
                         return makeValue_Nil(), true
                     } else if func.name == "timestamp" {
@@ -321,9 +338,15 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                     return ret_val, true
                 }
             } else {
-                reportError(expr.loc,
-                    "number of function params and passed arguments don't match: '%d' vs '%d'",
-                    len(func.params), len(e.args)) or_return
+                if has_rest_param {
+                    reportError(expr.loc,
+                        "number of function params and passed arguments don't match: func: '%d' or more; args: '%d'",
+                        len(func.params), len(e.args)) or_return
+                } else {
+                    reportError(expr.loc,
+                        "number of function params and passed arguments don't match: func: '%d'; args: '%d'",
+                        len(func.params), len(e.args)) or_return
+                }
             }
         } else {
             reportError(expr.loc, "can call only function expressions, but got '%v'", maybe_func) or_return
