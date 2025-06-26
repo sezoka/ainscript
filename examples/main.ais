@@ -4,7 +4,7 @@ builtin timestamp() end
 
 builtin loadLibrary(path) end
 builtin unloadLibrary(lib_ptr) end
-builtin loadLibraryFunc(lib_ptr ret_type name ..params) end
+builtin prepareLibraryFunc(lib_ptr ret_type name params) end
 builtin callLibraryFunc(func_handle params) end
 
 def variables()
@@ -22,7 +22,7 @@ def variables()
 end
 
 def factorial(n)
-    if n == 1 do
+    if n == 1
         return 1;
     end 
 
@@ -39,7 +39,7 @@ def functions()
     end
 
     def fib(n)
-        if n <= 1 do
+        if n <= 1
             return n;
         end
         return fib(n - 1) + fib(n - 2);
@@ -50,11 +50,17 @@ def functions()
         return rest;
     end
 
+    def emptyVarArgs(..rest)
+        println("emptyVarArgs", rest);
+        return rest;
+    end
+
+
     println(noArguments());
     println(withArguments(1, 2, 3));
     println(factorial(5));
     println(fib(10));
-    println(varArgsFunc(1, 2, 3, 4, 5, 6)); // TODO
+    println(emptyVarArgs()); // TODO
 end
 
 def arrays()
@@ -105,18 +111,46 @@ def structs()
     println("color", color);
 end
 
+A := 123;
+
+def loadLibraryFunc(lib_ptr ret_type name params)
+    B := 123;
+    func_handle := prepareLibraryFunc(lib_ptr, ret_type, name, params);
+    def call(..params)
+        return callLibraryFunc(func_handle, params);
+    end
+    return call;
+end
+
+
 def raylibExample()
+    C := 123;
     raylib := loadLibrary("/usr/lib/libraylib.so");
-    println("raylib:", raylib);
 
-    func_handle := loadLibraryFunc(raylib, "void", "InitWindow", "int", "int", "string");
-    callLibraryFunc(func_handle, {800, 600, "EBANIY BOBANIY VOT ETO DA"});
-    println(">>>", func_handle);
+    initWindow := loadLibraryFunc(raylib, "void", "InitWindow", {"int", "int", "pointer"});
+    quitWindow := loadLibraryFunc(raylib, "void", "CloseWindow", {});
+    beginDrawing := loadLibraryFunc(raylib, "void", "BeginDrawing", {});
+    endDrawing := loadLibraryFunc(raylib, "void", "EndDrawing", {});
+    windowShouldClose := loadLibraryFunc(raylib, "bool", "WindowShouldClose", {});
+    drawFPS := loadLibraryFunc(raylib, "void", "DrawFPS", {"int", "int"});
+    clearBackground := loadLibraryFunc(raylib, "void", "ClearBackground", {"u8", "u8", "u8", "u8"});
 
+    initWindow(800, 600, "hello from AinScript!");
+
+
+    while !windowShouldClose()
+        beginDrawing();
+        // clearBackground(0, 0, 0, 255);
+        // drawFPS(16, 16);
+        endDrawing();
+    end
+    
+    quitWindow();
     unloadLibrary(raylib);
 end
 
 def main()
+    D := 123;
     variables();
     functions();
     closure();

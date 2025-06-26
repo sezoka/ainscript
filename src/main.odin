@@ -33,7 +33,7 @@ main :: proc() {
 }
 
 readFile :: proc(path: string) -> ([]u8, bool) {
-    content, ok := os.read_entire_file(path, allocator=context.temp_allocator)
+    content, ok := os.read_entire_file(path, allocator=context.allocator)
     if !ok {
         core.printErr(nil, "failed to read file '%s'", path)
         return {}, false

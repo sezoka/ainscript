@@ -46,7 +46,7 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
     if matches(p, .If) {
         cond_expr := parseExpr(p) or_return
         block_loc := peek(p).loc
-        expect(p, .Do, "expect 'do' after conditional expression") or_return
+        // expect(p, .Do, "expect 'do' after conditional expression") or_return
         stmts : [dynamic]^core.Stmt
         for !matches(p, .End) {
             stmt := parseStmt(p) or_return
@@ -56,7 +56,7 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
     } else if matches(p, .While) {
         cond_expr := parseExpr(p) or_return
         block_loc := peek(p).loc
-        expect(p, .Do, "expect 'do' after conditional expression") or_return
+        // expect(p, .Do, "expect 'do' after conditional expression") or_return
         stmts : [dynamic]^core.Stmt
         for !matches(p, .End) {
             stmt := parseStmt(p) or_return
@@ -271,14 +271,16 @@ parseMult :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
 } 
 
 parseUnary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
-    unary_op_tokens := [?]tokenizer.TokenKind{ .Minus, .Plus }
+    unary_op_tokens := [?]tokenizer.TokenKind{ .Minus, .Plus, .Bang }
     if tok, matches := matchesAny(p, unary_op_tokens[:]); matches {
         expr := parseUnary(p) or_return
 
         op : core.UnaryOp
         #partial switch tok {
-        case .Minus:
+        case .Bang:
             op = .Negate
+        case .Minus:
+            op = .Minus
         case .Plus:
             op = .Identity
         case: panic("unreachable")

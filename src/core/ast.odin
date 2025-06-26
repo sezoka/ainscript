@@ -90,8 +90,9 @@ UnaryExpr :: struct {
 }
 
 UnaryOp :: enum {
-    Negate,
+    Minus,
     Identity,
+    Negate,
 }
 
 BinaryExpr :: struct {

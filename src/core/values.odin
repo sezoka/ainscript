@@ -68,7 +68,7 @@ Array :: struct {
     values: [dynamic]Value,
 }
 
-String :: distinct string
+String :: string
 
 StructField :: struct {
     name: string,

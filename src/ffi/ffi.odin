@@ -56,6 +56,7 @@ foreign lib {
 
 foreign lib {
     ffi_type_sint32: ffi_type
+    ffi_type_uint8: ffi_type
     ffi_type_pointer: ffi_type
     ffi_type_void: ffi_type
 }

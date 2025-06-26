@@ -36,11 +36,12 @@ pushScope :: proc(intr: ^Interpreter) {
 
 popScope :: proc(intr: ^Interpreter) {
     parent := intr.curr_scope.parent
-    assert(intr.curr_scope.ref_count != 0)
-    if intr.curr_scope.ref_count == 1 {
-        intr.curr_scope.ref_count = 0
+    intr.curr_scope.ref_count -= 1
+
+    if intr.curr_scope.ref_count == 0 {
         deleteScope(intr.curr_scope)
     }
+
     intr.curr_scope = parent
 }
 
@@ -69,6 +70,7 @@ findScopeThatHasVar :: proc(intr: ^Interpreter, var_name: string) -> ^core.Scope
     return nil
 }
 
+@(require_results)
 defineVariable :: proc(intr: ^Interpreter, loc: core.Location, name: string, val: core.Value) -> bool {
     is_exists := findScopeThatHasVar(intr, name) == currScope(intr)
     if is_exists {
@@ -162,9 +164,10 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
 }
 
 currScopeInc :: proc(intr: ^Interpreter) -> ^core.Scope {
-    scope := currScope(intr)
-    scope.ref_count += 1
-    return scope
+    for scope := intr.curr_scope; scope != nil; scope = scope.parent {
+        scope.ref_count += 1
+    }
+    return intr.curr_scope
 }
 
 interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value, ok: bool) {
@@ -186,7 +189,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
             } else {
                 reportError(expr.loc, "can use unary expession '+' only on numbers") or_return
             }
-        case .Negate:
+        case .Minus:
             num, is_num := val.(core.Number)
             if is_num {
                 negated := num
@@ -194,6 +197,13 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 return makeValue_Number(num), true
             } else {
                 reportError(expr.loc, "can use unary expession '-' only on numbers") or_return
+            }
+        case .Negate:
+            b, is_bool := val.(core.Bool)
+            if is_bool {
+                return makeValue_Bool(!b), true
+            } else {
+                reportError(expr.loc, "can use unary expession '!' only on booleans") or_return
             }
         }
     case core.IndexExpr:
@@ -284,7 +294,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
 
         if is_func {
             has_rest_param := len(func.params) != 0 && func.params[len(func.params)-1].is_rest
-            if len(func.params) == len(e.args) || (has_rest_param && len(func.params) <= len(e.args)) {
+            if len(func.params) == len(e.args) || (has_rest_param && len(func.params)-1 <= len(e.args)) {
                 // eval args
                 args := make([dynamic]core.Value, len(func.params))
                 defer delete(args)
@@ -305,15 +315,18 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                     args[len(func.params) - 1] = rest_arr
                 }
 
+
                 // create new scope
-                prev_scope := intr.curr_scope;
+                prev_scope := intr.curr_scope
                 defer intr.curr_scope = prev_scope
                 intr.curr_scope = func.scope
+
                 pushScope(intr); defer popScope(intr)
+
 
                 // define params
                 for arg, i in args {
-                    defineVariable(intr, expr.loc, func.params[i].name, arg)
+                    defineVariable(intr, expr.loc, func.params[i].name, arg) or_return
                 }
 
                 if func.is_builtin {
@@ -351,8 +364,10 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                         } else {
                             reportError(e.callable.loc, "builtin 'unloadLibrary' expects library pointer") or_return
                         }
-                    } else if func.name == "loadLibraryFunc" {
-                        return handleLoadLibraryFuncBuiltin(intr, e)
+                    } else if func.name == "prepareLibraryFunc" {
+                        return handlePrepareLibraryFuncBuiltin(intr, e)
+                    } else if func.name == "callLibraryFunc" {
+                        return handleCallLibraryFuncBuiltin(intr, e)
                     } else {
                         log.error("unhandled")
                         return {}, false
@@ -391,26 +406,59 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
     return {}, false
 }
 
-handleLoadLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (func_handle: core.Value, ok: bool) {
+handleCallLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (ret_val: core.Value, ok: bool) {
+    func_handle_val := currScope(intr).vars["func_handle"]
+    params_val := currScope(intr).vars["params"]
+
+    func_handle := checkType(intr, call.args[0].loc, func_handle_val, core.Number, "1 argument must be func handle") or_return
+    params := checkType(intr, call.args[1].loc, params_val, core.Array, "2 argument must be library handle") or_return
+
+
+    if int(func_handle.numeral) < len(intr.ffi_func_decls) && func_handle.denominator == 1 {
+        func_decl := intr.ffi_func_decls[func_handle.numeral]
+        converted_params: [100]rawptr
+        free_all(context.temp_allocator)
+        if len(func_decl.param_types) == len(params.values) {
+            for param, i in params.values {
+                converted_params[i] = convertASValueToCValuePtr(call.args[1].loc, param, func_decl.param_types_strs[i]) or_return
+            }
+            ret_value_buff: [256]u8 
+            ffi.call(&func_decl.cif, func_decl.func_ptr, &ret_value_buff, auto_cast &converted_params);
+            ret_value := convertCValueToASValue(call.callable.loc, &ret_value_buff, func_decl.ret_type_str) or_return
+            return ret_value, true;
+        } else {
+            reportError(call.callable.loc,
+                "number of function params and passed arguments don't match: func: '%d' args: '%d'",
+                len(func_decl.param_types), len(params.values)) or_return
+        }
+    } else {
+        reportError(call.args[0].loc, "invalid func handle") or_return
+    }
+
+    return {}, false
+}
+
+handlePrepareLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (func_handle: core.Value, ok: bool) {
     lib_ptr_val := currScope(intr).vars["lib_ptr"]
-    lib_ptr := checkType(intr, call.args[0].loc, lib_ptr_val, rawptr, "1 argument should be library handle") or_return
+    lib_ptr := checkType(intr, call.args[0].loc, lib_ptr_val, rawptr, "1 argument must be library handle") or_return
     ret_type_val := currScope(intr).vars["ret_type"]
-    ret_type := checkType(intr, call.args[1].loc, ret_type_val, core.String, "2 argument should be string representing type of return value") or_return
+    ret_type := checkType(intr, call.args[1].loc, ret_type_val, core.String, "2 argument must be string representing type of return value") or_return
     name_val := currScope(intr).vars["name"]
-    name := checkType(intr, call.args[2].loc, name_val, core.String, "3 argument should be string representing name of function") or_return
+    name := checkType(intr, call.args[2].loc, name_val, core.String, "3 argument must be string representing name of function") or_return
     params := currScope(intr).vars["params"].(core.Array)
 
     ffi_ret_type := ainsTypeStringToFFIType(string(ret_type), call.args[1].loc) or_return
+
     ffi_params := make([dynamic]^ffi.ffi_type, len(params.values))
-    as_ffi_params := make([dynamic]core.ValueType, len(params.values))
+    param_types_strs := make([dynamic]string, len(params.values))
 
     func_addr, found_func := dynlib.symbol_address(dynlib.Library(lib_ptr), string(name))
     if found_func {
         for param, i in params.values {
-            param_val := checkType(intr, call.args[3].loc, param, core.String, "return type should be string") or_return
-            ffi_param := ainsTypeStringToFFIType(string(param_val), call.args[3].loc) or_return
+            param_str := checkType(intr, call.args[3].loc, param, core.String, "return type should be string") or_return
+            ffi_param := ainsTypeStringToFFIType(string(param_str), call.args[3].loc) or_return
             ffi_params[i] = ffi_param
-            as_ffi_params[i] = core.valueToValueType(param_val)
+            param_types_strs[i] = string(param_str)
         }
 
         cif : ffi.ffi_cif
@@ -419,14 +467,17 @@ handleLoadLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) ->
             ffi_func_decl.cif = cif
             ffi_func_decl.func_ptr = func_addr
             ffi_func_decl.ret_type = ffi_ret_type
+            ffi_func_decl.ret_type_str = ret_type
             ffi_func_decl.param_types = ffi_params[:]
-            ffi_func_decl.as_param_types = as_ffi_params[:]
+            ffi_func_decl.param_types_strs = param_types_strs[:]
             append(&intr.ffi_func_decls, ffi_func_decl)
             func_idx := len(intr.ffi_func_decls) - 1
             return makeValue_Number({i64(func_idx), 1}), true
         } else {
             reportError(call.callable.loc, "failed preparing ffi call") or_return
         }
+    } else {
+        reportError(call.callable.loc, dynlib.last_error()) or_return
     }
 
     return {}, true
@@ -445,9 +496,10 @@ checkType :: proc(intr: ^Interpreter, loc: core.Location, value: core.Value, $T:
 printScopes :: proc(intr: ^Interpreter) {
     fmt.println("BEGIN")
     for scope := intr.curr_scope; scope != nil; scope = scope.parent {
-        for key, value in scope.vars {
-            fmt.println("  ", key)
-        }
+        // fmt.println("  ", scope.ref_count)
+        // for key, value in scope.vars {
+        //     fmt.println("  ", key, scope.ref_count)
+        // }
     }
     fmt.println("END")
 }
