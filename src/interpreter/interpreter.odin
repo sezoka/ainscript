@@ -1,6 +1,7 @@
 package aininterpreter
 
 import "../core"
+import "../ffi"
 import "core:log"
 import "core:fmt"
 import "core:time"
@@ -13,6 +14,7 @@ Interpreter :: struct {
     is_in_func: bool,
     should_return: bool,
     curr_scope: ^core.Scope,
+    ffi_func_decls: [dynamic]FFIFuncDecl,
 }
 
 makeScope :: proc(parent: ^core.Scope) -> ^core.Scope {
@@ -349,6 +351,8 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                         } else {
                             reportError(e.callable.loc, "builtin 'unloadLibrary' expects library pointer") or_return
                         }
+                    } else if func.name == "loadLibraryFunc" {
+                        return handleLoadLibraryFuncBuiltin(intr, e)
                     } else {
                         log.error("unhandled")
                         return {}, false
@@ -385,6 +389,57 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
 
     log.error("unhandled")
     return {}, false
+}
+
+handleLoadLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (func_handle: core.Value, ok: bool) {
+    lib_ptr_val := currScope(intr).vars["lib_ptr"]
+    lib_ptr := checkType(intr, call.args[0].loc, lib_ptr_val, rawptr, "1 argument should be library handle") or_return
+    ret_type_val := currScope(intr).vars["ret_type"]
+    ret_type := checkType(intr, call.args[1].loc, ret_type_val, core.String, "2 argument should be string representing type of return value") or_return
+    name_val := currScope(intr).vars["name"]
+    name := checkType(intr, call.args[2].loc, name_val, core.String, "3 argument should be string representing name of function") or_return
+    params := currScope(intr).vars["params"].(core.Array)
+
+    ffi_ret_type := ainsTypeStringToFFIType(string(ret_type), call.args[1].loc) or_return
+    ffi_params := make([dynamic]^ffi.ffi_type, len(params.values))
+    as_ffi_params := make([dynamic]core.ValueType, len(params.values))
+
+    func_addr, found_func := dynlib.symbol_address(dynlib.Library(lib_ptr), string(name))
+    if found_func {
+        for param, i in params.values {
+            param_val := checkType(intr, call.args[3].loc, param, core.String, "return type should be string") or_return
+            ffi_param := ainsTypeStringToFFIType(string(param_val), call.args[3].loc) or_return
+            ffi_params[i] = ffi_param
+            as_ffi_params[i] = core.valueToValueType(param_val)
+        }
+
+        cif : ffi.ffi_cif
+        if ffi.prep_cif(&cif, .FFI_DEFAULT_ABI, u32(len(params.values)), ffi_ret_type, raw_data(ffi_params)) == .FFI_OK {
+            ffi_func_decl : FFIFuncDecl
+            ffi_func_decl.cif = cif
+            ffi_func_decl.func_ptr = func_addr
+            ffi_func_decl.ret_type = ffi_ret_type
+            ffi_func_decl.param_types = ffi_params[:]
+            ffi_func_decl.as_param_types = as_ffi_params[:]
+            append(&intr.ffi_func_decls, ffi_func_decl)
+            func_idx := len(intr.ffi_func_decls) - 1
+            return makeValue_Number({i64(func_idx), 1}), true
+        } else {
+            reportError(call.callable.loc, "failed preparing ffi call") or_return
+        }
+    }
+
+    return {}, true
+}
+
+checkType :: proc(intr: ^Interpreter, loc: core.Location, value: core.Value, $T: typeid, msg: string) -> (val: T, ok: bool) {
+    inner_type, is_match := value.(T)
+    if is_match {
+        return inner_type, true
+    } else {
+        reportError(loc, "%s, but got '%v'", msg, value) or_return
+        return {}, false
+    }
 }
 
 printScopes :: proc(intr: ^Interpreter) {

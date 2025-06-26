@@ -101,7 +101,7 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
                         append(&params, core.FuncParam{name=param_name, is_rest=true})
                     }
                 } else {
-                    reportError(p, loc, "expect param name, but got '%v'", maybe_param_name_tok.lexeme)
+                    reportError(p, maybe_param_name_tok.loc, "expect param name, but got '%v'", maybe_param_name_tok.lexeme)
                     return {}, false
                 }
             }
@@ -362,7 +362,11 @@ parsePrimary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
 
         return makeExpr(tok.loc, core.StructExpr{fields=fields[:]})
     case:
-        reportError(p, tok.loc, "unexpected token '%v'", tok.lexeme)
+        if tok.kind == .Eof {
+            reportError(p, tok.loc, "unexpected end of file")
+        } else {
+            reportError(p, tok.loc, "unexpected token '%v'", tok.lexeme)
+        }
         return {}, false
     }
     return {}, false
@@ -443,5 +447,3 @@ matchesAny :: proc(p: ^Parser, toks: []tokenizer.TokenKind) -> (tokenizer.TokenK
     }
     return {}, false
 }
-
-

@@ -4,6 +4,8 @@ builtin timestamp() end
 
 builtin loadLibrary(path) end
 builtin unloadLibrary(lib_ptr) end
+builtin loadLibraryFunc(lib_ptr ret_type name ..params) end
+builtin callLibraryFunc(func_handle params) end
 
 def variables()
     println("VARIABLES");
@@ -100,12 +102,17 @@ def structs()
 
     color := Color(100, 200, 123, 255);
 
-    print("color", color);
+    println("color", color);
 end
 
 def raylibExample()
     raylib := loadLibrary("/usr/lib/libraylib.so");
-    print(raylib);
+    println("raylib:", raylib);
+
+    func_handle := loadLibraryFunc(raylib, "void", "InitWindow", "int", "int", "string");
+    callLibraryFunc(func_handle, {800, 600, "EBANIY BOBANIY VOT ETO DA"});
+    println(">>>", func_handle);
+
     unloadLibrary(raylib);
 end
 
@@ -120,14 +127,4 @@ def main()
 end
 
 main();
-
-
-
-
-
-
-
-
-
-
 

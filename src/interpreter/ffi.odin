@@ -2,6 +2,7 @@ package aininterpreter
 
 import "core:dynlib"
 import "../core"
+import "../ffi"
 
 loadLibrary :: proc(loc: core.Location, lib_path: string) -> (lib: dynlib.Library, ok: bool) {
     lib, ok = dynlib.load_library(lib_path)
@@ -10,6 +11,29 @@ loadLibrary :: proc(loc: core.Location, lib_path: string) -> (lib: dynlib.Librar
     }
     return lib, true
 }
+
+ainsTypeStringToFFIType :: proc(type: string, loc: core.Location) -> (t: ^ffi.ffi_type, ok: bool) {
+    switch type {
+    case "void":
+        return &ffi.ffi_type_void, true
+    case "int":
+        return &ffi.ffi_type_sint32, true
+    case "string":
+        return &ffi.ffi_type_pointer, true
+    case:
+        reportError(loc, "unhandled type") or_return
+        return {}, false
+    }
+}
+
+FFIFuncDecl :: struct {
+    cif: ffi.ffi_cif,
+    func_ptr: rawptr,
+    ret_type: ^ffi.ffi_type,
+    param_types: []^ffi.ffi_type,
+    as_param_types: []core.ValueType,
+}
+
 //
 // callFunc :: proc(lib_path: string, func_name: string) {
 //     if ok {
