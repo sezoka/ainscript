@@ -118,7 +118,7 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
                 break
             }
         } else {
-            reportError(v.cond.loc, "expect bool as conditional value, but got: '%v'", cond_res) or_return
+            reportError(v.cond.loc, "expect bool as conditional value, but got: '%s'", formatType(cond_res)) or_return
         }
     case core.WhileStmt:
         for {
@@ -131,7 +131,7 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
                     break
                 }
             } else {
-                reportError(v.cond.loc, "expect bool as conditional value, but got: '%v'", cond_res) or_return
+                reportError(v.cond.loc, "expect bool as conditional value, but got: '%s'", formatType(cond_res)) or_return
             }
         }
     case core.RetStmt:
@@ -229,10 +229,10 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                     reportError(e.indexable.loc, "can index only inside arrays") or_return
                 }
             } else {
-                reportError(e.index.loc, "index should be a positive number, but got '%d'", index) or_return
+                reportError(e.index.loc, "index should be a positive number, but got '%s'", formatValue(index_val)) or_return
             }
         } else {
-            reportError(e.index.loc, "index expression should evaluate to a number, but got '%v'", index_val) or_return
+            reportError(e.index.loc, "index expression should evaluate to a number, but got '%s'", formatValue(index_val)) or_return
         }
     case core.BinaryExpr:
         left := interpretExpr(intr, e.left) or_return
@@ -273,7 +273,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 return makeValue_Bool(a.numeral * b.denominator != b.numeral * a.denominator), true
             }
         } else {
-            reportError(expr.loc, "operator %v expects number operands, but got '%v' and '%v'", e.op, a, b) or_return
+            reportError(expr.loc, "operator '%v' expects number operands, but got '%s' and '%s'", e.op, formatType(a), formatType(b)) or_return
         }
     case core.IdentExpr:
         return findVar(intr, expr.loc, e.name)
@@ -402,7 +402,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 }
             }
         } else {
-            reportError(expr.loc, "can call only function expressions, but got '%v'", maybe_func) or_return
+            reportError(expr.loc, "can call only function expressions, but got '%s'", formatType(maybe_func)) or_return
         }
     }
 
@@ -459,7 +459,7 @@ handlePrepareLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr)
     func_addr, found_func := dynlib.symbol_address(dynlib.Library(lib_ptr), string(name))
     if found_func {
         for param, i in params.values {
-            param_str := checkType(intr, call.args[3].loc, param, core.String, "return type should be string") or_return
+            param_str := checkType(intr, call.args[3].loc, param, core.String, "param type should be string") or_return
             ffi_param := ainsTypeStringToFFIType(string(param_str), call.args[3].loc) or_return
             ffi_params[i] = ffi_param
             param_types_strs[i] = string(param_str)
@@ -492,7 +492,7 @@ checkType :: proc(intr: ^Interpreter, loc: core.Location, value: core.Value, $T:
     if is_match {
         return inner_type, true
     } else {
-        reportError(loc, "%s, but got '%v'", msg, value) or_return
+        reportError(loc, "%s, but got '%s'", msg, formatType(value)) or_return
         return {}, false
     }
 }

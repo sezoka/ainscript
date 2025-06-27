@@ -140,7 +140,7 @@ def raylibExample()
     
     // drawText := loadLibraryFunc(raylib, "void", "DrawText", {"pointer", "int", "int", "int", "color"});
 
-    clearBackground := loadLibraryFunc(raylib, "void", "ClearBackground", {"u8", "u8", "u8", "u8"});
+    clearBackground := loadLibraryFunc(raylib, "void", "ClearBackground", {Color});
 
     initWindow(800, 600, "hello from AinScript!");
     setTargetFPS(60);

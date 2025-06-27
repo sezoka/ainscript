@@ -2,6 +2,7 @@ package aininterpreter
 
 import "../core"
 import "core:fmt"
+import "core:strings"
 
 makeValue_Pointer :: proc(ptr: rawptr) -> core.Value {
     return ptr
@@ -89,45 +90,103 @@ deleteValue :: proc(val: core.Value) {
     }
 }
 
-printValue :: proc(val: core.Value) {
+formatValue :: proc(val: core.Value) -> string {
+    b: strings.Builder
+    strings.builder_init(&b, allocator=context.temp_allocator)
+    formatValueImpl(&b, val)
+    return strings.to_string(b)
+}
+
+formatType :: proc(val: core.Value) -> string {
+    formatTypeImpl :: proc(b: ^strings.Builder, val: core.Value) {
+        switch v in val {
+        case core.Number:
+            strings.write_string(b, "number")
+        case core.Func:
+            strings.write_string(b, formatValue(val))
+        case core.Nil:
+            strings.write_string(b, "nil")
+        case core.Bool:
+            strings.write_string(b, "bool")
+        case core.String:
+            strings.write_string(b, "string")
+        case ^core.Array:
+            strings.write_string(b, "array")
+        case ^core.Struct:
+            strings.write_string(b, "#{ ")
+            for field, i in v.fields {
+                strings.write_string(b, field.name)
+                if i != len(v.fields) - 1 {
+                    strings.write_string(b, ",")
+                }
+                strings.write_string(b, " ")
+            }
+            strings.write_string(b, "}")
+
+        case rawptr:
+        }
+    }
+
+    b: strings.Builder
+    strings.builder_init(&b, allocator=context.temp_allocator)
+    formatTypeImpl(&b, val)
+    return strings.to_string(b)
+}
+
+formatValueImpl :: proc(b: ^strings.Builder, val: core.Value) {
     switch v in val {
     case rawptr:
-        fmt.printf("ptr(%d)", v)
+        strings.write_string(b, "ptr(")
+        strings.write_int(b, int(uintptr(v)))
+        strings.write_string(b, ")")
     case ^core.Struct:
-        fmt.print("#{ ")
+        strings.write_string(b, "#{ ")
         for field, i in v.fields {
-            fmt.print(field.name)
-            fmt.print("=")
-            printValue(field.value)
+            strings.write_string(b, field.name)
+            strings.write_string(b, "=")
+            formatValueImpl(b, field.value)
             if i != len(v.fields) - 1 {
-                fmt.print(",")
+                strings.write_string(b, ",")
             }
-            fmt.print(" ")
+            strings.write_string(b, " ")
         }
-        fmt.print("}")
+        strings.write_string(b, " }")
     case ^core.Array:
-        fmt.print("{ ")
+        strings.write_string(b, "{ ")
         for value, i in v.values {
-            printValue(value)
+            formatValueImpl(b, value)
             if i != len(v.values) - 1 {
-                fmt.print(",")
+                strings.write_string(b, ", ")
             }
-            fmt.print(" ")
+            strings.write_string(b, " ")
         }
-        fmt.print("}")
+        strings.write_string(b, "}")
     case core.String:
-        fmt.print(v)
+        strings.write_string(b, v)
     case core.Number:
         num := normalizeNumber(v)
         float := f64(num.numeral) / f64(num.denominator)
-        fmt.print(float)
+        strings.write_f64(b, float, 'f')
     case core.Func:
-        fmt.printf("func(%s)%v", v.name, v.params)
+        strings.write_string(b, "def ")
+        strings.write_string(b, v.name)
+        strings.write_string(b, "(")
+        for param, i in v.params {
+            strings.write_string(b, param.name)
+            if i != len(v.params) - 1 {
+                strings.write_string(b, " ")
+            }
+        }
+        strings.write_string(b, ")")
     case core.Nil:
-        fmt.print("nil")
+        strings.write_string(b, "nil")
     case core.Bool:
-        fmt.print(v)
+        strings.write_string(b, v ? "true" : "false")
     }
+}
+
+printValue :: proc(val: core.Value) {
+    fmt.print(formatValue(val))
 }
 
 normalizeNumber :: proc(v: core.Number) -> core.Number {
