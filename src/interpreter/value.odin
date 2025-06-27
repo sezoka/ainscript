@@ -8,11 +8,18 @@ makeValue_Pointer :: proc(ptr: rawptr) -> core.Value {
 }
 
 makeValue_Array :: proc(values: [dynamic]core.Value) -> core.Value {
-    return core.Array{values=values}
+    arr := new(core.Array)
+    for &v in values {
+        increaseValueRefCount(v)
+    }
+    arr.values = values
+    return arr
 }
 
 makeValue_Struct :: proc(fields: []core.StructField) -> core.Value {
-    return core.Struct{fields=fields}
+    strct := new(core.Struct)
+    strct.fields = fields
+    return strct
 }
 
 makeValue_Number :: proc(n: core.Number) -> core.Value {
@@ -42,11 +49,51 @@ makeValue_Func :: proc(name: string,
     }
 }
 
+increaseValueRefCount :: proc(val: core.Value) {
+    switch &v in val {
+    case core.Number, core.Nil, core.Bool, core.String, rawptr:
+        return
+    case ^core.Array:
+        v.ref_count += 1
+    case ^core.Struct:
+        v.ref_count += 1
+    case core.Func:
+    }
+}
+
+deleteValue :: proc(val: core.Value) {
+    switch &v in val {
+    case core.Number, core.Nil, core.Bool, core.String, rawptr:
+        return
+    case ^core.Array:
+        assert(v.ref_count != 0)
+        v.ref_count -= 1
+        if v.ref_count <= 0 {
+            for item in v.values {
+                deleteValue(item)
+            }
+            delete(v.values)
+            free(v)
+        }
+    case ^core.Struct:
+        assert(v.ref_count != 0)
+        v.ref_count -= 1
+        if v.ref_count <= 0 {
+            for field in v.fields {
+                deleteValue(field.value)
+            }
+            delete(v.fields)
+            free(v)
+        }
+    case core.Func:
+    }
+}
+
 printValue :: proc(val: core.Value) {
     switch v in val {
     case rawptr:
         fmt.printf("ptr(%d)", v)
-    case core.Struct:
+    case ^core.Struct:
         fmt.print("#{ ")
         for field, i in v.fields {
             fmt.print(field.name)
@@ -58,7 +105,7 @@ printValue :: proc(val: core.Value) {
             fmt.print(" ")
         }
         fmt.print("}")
-    case core.Array:
+    case ^core.Array:
         fmt.print("{ ")
         for value, i in v.values {
             printValue(value)

@@ -34,8 +34,8 @@ Value :: union {
     Nil,
     Bool,
     String,
-    Array,
-    Struct,
+    ^Array,
+    ^Struct,
     rawptr,
 }
 
@@ -57,8 +57,8 @@ valueToValueType :: proc(v: Value) -> ValueType {
     case Nil: return .Nil
     case Bool: return .Bool
     case String: return .String
-    case Array: return .Array
-    case Struct: return .Struct
+    case ^Array: return .Array
+    case ^Struct: return .Struct
     case rawptr: return .rawptr
     }
     return {}
@@ -66,6 +66,7 @@ valueToValueType :: proc(v: Value) -> ValueType {
 
 Array :: struct {
     values: [dynamic]Value,
+    ref_count: int,
 }
 
 String :: string
@@ -77,4 +78,5 @@ StructField :: struct {
 
 Struct :: struct {
     fields: []StructField,
+    ref_count: int,
 }

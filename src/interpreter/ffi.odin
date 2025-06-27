@@ -128,8 +128,8 @@ convertASValueToCValuePtr :: proc(loc: core.Location, value: core.Value, target_
         case:
             reportError(loc, "can't convert AinScript bool to c '%s'", target_type) or_return
         }
-    case core.Array:
-    case core.Struct:
+    case ^core.Array:
+    case ^core.Struct:
     case rawptr:
     }
 

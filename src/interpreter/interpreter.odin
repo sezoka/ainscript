@@ -24,6 +24,9 @@ makeScope :: proc(parent: ^core.Scope) -> ^core.Scope {
 }
 
 deleteScope :: proc(s: ^core.Scope) {
+    for name, val in s.vars {
+        deleteValue(val)
+    }
     delete(s.vars)
     free(s)
 }
@@ -72,6 +75,7 @@ findScopeThatHasVar :: proc(intr: ^Interpreter, var_name: string) -> ^core.Scope
 
 @(require_results)
 defineVariable :: proc(intr: ^Interpreter, loc: core.Location, name: string, val: core.Value) -> bool {
+    increaseValueRefCount(val)
     is_exists := findScopeThatHasVar(intr, name) == currScope(intr)
     if is_exists {
         reportError(loc, "variable with name '%s' already exists", name) or_return
@@ -213,7 +217,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
             index := number.numeral / number.denominator
             if 0 <= index {
                 indexable := interpretExpr(intr, e.indexable) or_return
-                arr, is_arr := indexable.(core.Array)
+                arr, is_arr := indexable.(^core.Array)
                 if is_arr {
                     if int(index) < len(arr.values) {
                         indexed_value := arr.values[index]
@@ -332,7 +336,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 if func.is_builtin {
                     if func.name == "println" || func.name == "print" {
                         val := currScope(intr).vars["val"]
-                        val_arr := val.(core.Array)
+                        val_arr := val.(^core.Array)
                         for val, i in val_arr.values {
                             printValue(val)
                             if i != len(val_arr.values) - 1 {
@@ -411,7 +415,7 @@ handleCallLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) ->
     params_val := currScope(intr).vars["params"]
 
     func_handle := checkType(intr, call.args[0].loc, func_handle_val, core.Number, "1 argument must be func handle") or_return
-    params := checkType(intr, call.args[1].loc, params_val, core.Array, "2 argument must be library handle") or_return
+    params := checkType(intr, call.args[1].loc, params_val, ^core.Array, "2 argument must be library handle") or_return
 
 
     if int(func_handle.numeral) < len(intr.ffi_func_decls) && func_handle.denominator == 1 {
@@ -445,7 +449,7 @@ handlePrepareLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr)
     ret_type := checkType(intr, call.args[1].loc, ret_type_val, core.String, "2 argument must be string representing type of return value") or_return
     name_val := currScope(intr).vars["name"]
     name := checkType(intr, call.args[2].loc, name_val, core.String, "3 argument must be string representing name of function") or_return
-    params := currScope(intr).vars["params"].(core.Array)
+    params := currScope(intr).vars["params"].(^core.Array)
 
     ffi_ret_type := ainsTypeStringToFFIType(string(ret_type), call.args[1].loc) or_return
 
