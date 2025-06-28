@@ -153,7 +153,7 @@ end
 def raylibExample()
     rl := loadRaylib();
     
-    rl.initWindow(800, 600, "hello from AinScript!");
+    // rl.initWindow(800, 600, "hello from AinScript!");
     setTargetFPS(60);
 
     text_x := 100;
@@ -189,13 +189,13 @@ def test3(..data)
 end
 
 def main()
-    // D := 123;
-    // variables();
-    // functions();
-    // closure();
-    // strings();
-    // arrays();
-    // structs();
+    D := 123;
+    variables();
+    functions();
+    closure();
+    strings();
+    arrays();
+    structs();
     raylibExample();
 end
 

@@ -150,13 +150,13 @@ formatValueImpl :: proc(b: ^strings.Builder, val: core.Value) {
             }
             strings.write_string(b, " ")
         }
-        strings.write_string(b, " }")
+        strings.write_string(b, "}")
     case ^core.Array:
         strings.write_string(b, "{ ")
         for value, i in v.values {
             formatValueImpl(b, value)
             if i != len(v.values) - 1 {
-                strings.write_string(b, ", ")
+                strings.write_string(b, ",")
             }
             strings.write_string(b, " ")
         }
@@ -166,7 +166,11 @@ formatValueImpl :: proc(b: ^strings.Builder, val: core.Value) {
     case core.Number:
         num := normalizeNumber(v)
         float := f64(num.numeral) / f64(num.denominator)
-        strings.write_f64(b, float, 'f')
+        if num.denominator == 1 {
+            strings.write_i64(b, num.numeral)
+        } else {
+            strings.write_f64(b, float, 'f')
+        }
     case core.Func:
         strings.write_string(b, "def ")
         strings.write_string(b, v.name)
