@@ -176,6 +176,26 @@ currScopeInc :: proc(intr: ^Interpreter) -> ^core.Scope {
 
 interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value, ok: bool) {
     switch e in expr.vart {
+    case core.AccessExpr:
+        accessable := interpretExpr(intr, e.expr) or_return
+        strct, is_struct := accessable.(^core.Struct)
+        if is_struct {
+            for field in strct.fields {
+                if field.name == e.field_name {
+                    return field.value, true
+                }
+            }
+            reportError(
+                expr.loc, "field '%s' was not found in struct '%s'",
+                e.field_name,
+                formatType(accessable)
+            ) or_return
+        } else {
+            reportError(
+                expr.loc, "can use '.' operator only to access struct fields, but accessing '%s'",
+                formatType(accessable)
+            ) or_return
+        }
     case core.StructExpr:
         fields := make([]core.StructField, len(e.fields))
         for i in 0..<len(fields) {

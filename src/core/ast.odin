@@ -128,6 +128,7 @@ ExprVart :: union {
     IndexExpr,
     UnaryExpr,
     StructExpr,
+    AccessExpr,
 }
 
 StructExpr :: struct {
@@ -137,4 +138,9 @@ StructExpr :: struct {
 StructFieldExpr :: struct {
     name: string,
     value: ^Expr,
+}
+
+AccessExpr :: struct {
+    field_name: string,
+    expr: ^Expr,
 }

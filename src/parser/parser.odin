@@ -293,13 +293,22 @@ parseUnary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
     return parseCall(p)
 }
 
-parseCall :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
-    callable := parsePrimary(p) or_return
+parseCall :: proc(p: ^Parser) -> (e: ^core.Expr, ok: bool) {
+    expr := parsePrimary(p) or_return
 
-    if matches(p, .LeftBracket) {
+    if matches(p, .Dot) {
+        field_name_tok := next(p)
+        if field_name_tok.kind == .Ident {
+            field_name := field_name_tok.value.(core.String)
+            expr = makeExpr(expr.loc, core.AccessExpr{expr=expr, field_name=field_name}) or_return
+        } else {
+            reportError(p, field_name_tok.loc, "expect field name after '.'")
+            return {}, false
+        }
+    } if matches(p, .LeftBracket) {
         index_expr := parseExpr(p) or_return;
         expect(p, .RightBracket, "expect ']' after index expression") or_return
-        return makeExpr(callable.loc, core.IndexExpr{indexable=callable, index=index_expr})
+        expr = makeExpr(expr.loc, core.IndexExpr{indexable=expr, index=index_expr}) or_return
     } else if matches(p, .LeftParen) {
         args : [dynamic]^core.Expr
         for peek(p).kind != .RightParen {
@@ -310,9 +319,9 @@ parseCall :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
             }
         }
         expect(p, .RightParen, "expect ')' after call arguments") or_return
-        return makeExpr(callable.loc, core.CallExpr{callable=callable, args=args[:]})
+        expr = makeExpr(expr.loc, core.CallExpr{callable=expr, args=args[:]}) or_return
     }
-    return callable, true
+    return expr, true
 }
 
 parsePrimary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {

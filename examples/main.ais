@@ -1,3 +1,4 @@
+// prelude-start
 builtin println(..val) end
 builtin print(..val) end
 builtin timestamp() end
@@ -6,6 +7,15 @@ builtin loadLibrary(path) end
 builtin unloadLibrary(lib_ptr) end
 builtin prepareLibraryFunc(lib_ptr ret_type name params) end
 builtin callLibraryFunc(func_handle params) end
+
+def loadLibraryFunc(lib_ptr ret_type name params)
+    func_handle := prepareLibraryFunc(lib_ptr, ret_type, name, params);
+    def call(..params)
+        return callLibraryFunc(func_handle, params);
+    end
+    return call;
+end
+// prelude-end
 
 def variables()
     println("VARIABLES");
@@ -111,14 +121,6 @@ def structs()
     println("color", color);
 end
 
-def loadLibraryFunc(lib_ptr ret_type name params)
-    func_handle := prepareLibraryFunc(lib_ptr, ret_type, name, params);
-    def call(..params)
-        return callLibraryFunc(func_handle, params);
-    end
-    return call;
-end
-
 def loadRaylib()
     raylib := loadLibrary("/usr/lib/libraylib.so");
 
@@ -131,6 +133,10 @@ def loadRaylib()
 
     def Color(r g b a)
         return #{r=r, g=g, b=b, a=a};
+    end
+
+    def unloadRaylib()
+        unloadLibrary(raylib);
     end
 
     return #{
@@ -146,6 +152,7 @@ def loadRaylib()
         getScreenHeight = loadLibraryFunc(raylib, "i32", "GetScreenHeight", {}),
         drawText = loadLibraryFunc(raylib, "void", "DrawText", {"pointer", "i32", "i32", "i32", TColor}),
         clearBackground = loadLibraryFunc(raylib, "void", "ClearBackground", {TColor}),
+        unloadRaylib = unloadRaylib,
     };
 end
 
@@ -153,26 +160,25 @@ end
 def raylibExample()
     rl := loadRaylib();
     
-    // rl.initWindow(800, 600, "hello from AinScript!");
-    setTargetFPS(60);
+    rl.initWindow(800, 600, "hello from AinScript!");
+    rl.setTargetFPS(60);
 
     text_x := 100;
     text_y := 100;
 
-    scr_w := getScreenWidth();
-    scr_h := getScreenHeight();
+    scr_w := rl.getScreenWidth();
+    scr_h := rl.getScreenHeight();
 
-    while windowShouldClose() == 0
-        beginDrawing();
-        clearBackground(Color(18, 18, 18, 255));
-        drawText("Hello From AinScript!", text_x, text_y, 28, Color(255, 255, 255, 255));
-        println(text_w, text_h);
-        drawFPS(16, 16);
-        endDrawing();
+    while rl.windowShouldClose() == 0
+        rl.beginDrawing();
+        rl.clearBackground(rl.Color(18, 18, 18, 255));
+        rl.drawText("Hello From AinScript!", text_x, text_y, 28, rl.Color(255, 255, 255, 255));
+        rl.drawFPS(16, 16);
+        rl.endDrawing();
     end
     
-    quitWindow();
-    unloadLibrary(raylib);
+    rl.quitWindow();
+    rl.unloadRaylib();
 end
 
 def test2(data)
