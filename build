@@ -1,1 +1,1 @@
-odin build src -out:ais
+odin build src -out:ais -o:none

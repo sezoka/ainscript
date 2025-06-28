@@ -13,22 +13,24 @@ printMsg :: proc(level: LogLevel, loc: Maybe(Location), msg: string, args: ..any
     builder : strings.Builder
     strings.builder_init_none(&builder, allocator=context.temp_allocator)
 
+    switch level {
+    case .Error:
+        strings.write_string(&builder, "\033[31mError\033[0m")
+    case .Debug:
+        strings.write_string(&builder, "\033[34mDebug\033[0m")
+    case .Warn: 
+        strings.write_string(&builder, "\033[33mWarn\033[0m")
+    }
+
     loc, is_loc := loc.?
     if is_loc {
-        strings.write_string(&builder, "[")
+        strings.write_string(&builder, "(")
         strings.write_int(&builder, loc.line)
         strings.write_string(&builder, ":")
         strings.write_int(&builder, loc.col)
-        strings.write_string(&builder, "]")
-    }
-
-    switch level {
-    case .Error:
-        strings.write_string(&builder, "Error: ")
-    case .Debug:
-        strings.write_string(&builder, "Debug: ")
-    case .Warn: 
-        strings.write_string(&builder, "Warn: ")
+        strings.write_string(&builder, "): ")
+    } else {
+        strings.write_string(&builder, ": ")
     }
 
     strings.write_string(&builder, msg)

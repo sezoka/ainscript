@@ -229,10 +229,10 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                     reportError(e.indexable.loc, "can index only inside arrays") or_return
                 }
             } else {
-                reportError(e.index.loc, "index should be a positive number, but got '%s'", formatValue(index_val)) or_return
+                reportError(e.index.loc, "index must be a positive number, but got '%s'", formatValue(index_val)) or_return
             }
         } else {
-            reportError(e.index.loc, "index expression should evaluate to a number, but got '%s'", formatValue(index_val)) or_return
+            reportError(e.index.loc, "index expression must evaluate to a number, but got '%s'", formatValue(index_val)) or_return
         }
     case core.BinaryExpr:
         left := interpretExpr(intr, e.left) or_return
@@ -424,11 +424,15 @@ handleCallLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) ->
         free_all(context.temp_allocator)
         if len(func_decl.param_types) == len(params.values) {
             for param, i in params.values {
-                converted_params[i] = convertASValueToCValuePtr(call.args[1].loc, param, func_decl.param_types_strs[i]) or_return
+                converted_params[i] = convertASValueToCValuePtr(
+                    call.args[1].loc,
+                    param,
+                    func_decl.param_types[i],
+                ) or_return
             }
             ret_value_buff: [256]u8 
             ffi.call(&func_decl.cif, func_decl.func_ptr, &ret_value_buff, auto_cast &converted_params);
-            ret_value := convertCValueToASValue(call.callable.loc, &ret_value_buff, func_decl.ret_type_str) or_return
+            ret_value := convertCValueToASValue(call.callable.loc, &ret_value_buff, func_decl.ret_type) or_return
             return ret_value, true;
         } else {
             reportError(call.callable.loc,
@@ -454,15 +458,24 @@ handlePrepareLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr)
     ffi_ret_type := ainsTypeStringToFFIType(string(ret_type), call.args[1].loc) or_return
 
     ffi_params := make([dynamic]^ffi.ffi_type, len(params.values))
-    param_types_strs := make([dynamic]string, len(params.values))
 
     func_addr, found_func := dynlib.symbol_address(dynlib.Library(lib_ptr), string(name))
     if found_func {
         for param, i in params.values {
-            param_str := checkType(intr, call.args[3].loc, param, core.String, "param type should be string") or_return
-            ffi_param := ainsTypeStringToFFIType(string(param_str), call.args[3].loc) or_return
-            ffi_params[i] = ffi_param
-            param_types_strs[i] = string(param_str)
+            param_str, is_string_param := param.(core.String)
+            param_struct, is_struct_param := param.(^core.Struct)
+            if is_struct_param || is_string_param {
+                if is_string_param {
+                    ffi_param := ainsTypeStringToFFIType(string(param_str), call.args[3].loc) or_return
+                    ffi_params[i] = ffi_param
+                } else {
+                    ffi_param := ainsStructTypeToFFIStructType(param_struct, call.args[3].loc) or_return
+                    ffi_params[i] = ffi_param
+                }
+            } else {
+                reportError(call.args[3].loc, "ffi param type must be string or struct, but got '%s'", formatType(param)) or_return
+            }
+
         }
 
         cif : ffi.ffi_cif
@@ -471,9 +484,7 @@ handlePrepareLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr)
             ffi_func_decl.cif = cif
             ffi_func_decl.func_ptr = func_addr
             ffi_func_decl.ret_type = ffi_ret_type
-            ffi_func_decl.ret_type_str = ret_type
             ffi_func_decl.param_types = ffi_params[:]
-            ffi_func_decl.param_types_strs = param_types_strs[:]
             append(&intr.ffi_func_decls, ffi_func_decl)
             func_idx := len(intr.ffi_func_decls) - 1
             return makeValue_Number({i64(func_idx), 1}), true
@@ -510,8 +521,7 @@ printScopes :: proc(intr: ^Interpreter) {
 
 @(require_results)
 reportError :: proc(loc: core.Location, fmt: string, args: ..any) -> bool {
-    // p.had_error = true
-    strs : [2]string = { "Interpreter: ", fmt }
+    strs : [3]string = { core.textColor("interpreter", .Blue), ": ", fmt }
     str := strings.concatenate(strs[:], allocator=context.temp_allocator)
     core.printErr(loc, str, ..args)
     return false

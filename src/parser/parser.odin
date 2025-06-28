@@ -410,7 +410,7 @@ peekNext :: proc(t: ^Parser) -> tokenizer.Token {
 
 reportError :: proc(p: ^Parser, loc: core.Location, fmt: string, args: ..any) {
     p.had_error = true
-    strs : [2]string = { "Parser: ", fmt }
+    strs : [3]string = { core.textColor("parser", .Blue), ": ", fmt }
     str := strings.concatenate(strs[:], allocator=context.temp_allocator)
     core.printErr(loc, str, ..args)
 }

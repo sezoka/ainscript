@@ -141,7 +141,7 @@ peek :: proc(t: ^Tokenizer) -> rune {
 
 reportError :: proc(t: ^Tokenizer, fmt: string, args: ..any) {
     t.had_error = true
-    strs : [2]string = { "Tokenizer: ", fmt }
+    strs : [3]string = { core.textColor("tokenizer", .Blue), ": ", fmt }
     str := strings.concatenate(strs[:], allocator=context.temp_allocator)
     core.printErr(t.curr_token_loc, str, ..args)
 }

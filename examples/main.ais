@@ -119,35 +119,54 @@ def loadLibraryFunc(lib_ptr ret_type name params)
     return call;
 end
 
-
-def raylibExample()
+def loadRaylib()
     raylib := loadLibrary("/usr/lib/libraylib.so");
 
-    initWindow := loadLibraryFunc(raylib, "void", "InitWindow", {"int", "int", "pointer"});
-    quitWindow := loadLibraryFunc(raylib, "void", "CloseWindow", {});
-    beginDrawing := loadLibraryFunc(raylib, "void", "BeginDrawing", {});
-    endDrawing := loadLibraryFunc(raylib, "void", "EndDrawing", {});
-    windowShouldClose := loadLibraryFunc(raylib, "bool", "WindowShouldClose", {});
-    drawFPS := loadLibraryFunc(raylib, "void", "DrawFPS", {"int", "int"});
-    setTargetFPS := loadLibraryFunc(raylib, "void", "SetTargetFPS", {"int"});
-
-    Color := #{
+    TColor := #{
         r = "u8",
         g = "u8",
         b = "u8",
         a = "u8",
     };
+
+    def Color(r g b a)
+        return #{r=r, g=g, b=b, a=a};
+    end
+
+    return #{
+        Color = Color,
+        initWindow = loadLibraryFunc(raylib, "void", "InitWindow", {"i32", "i32", "pointer"}),
+        quitWindow = loadLibraryFunc(raylib, "void", "CloseWindow", {}),
+        beginDrawing = loadLibraryFunc(raylib, "void", "BeginDrawing", {}),
+        endDrawing = loadLibraryFunc(raylib, "void", "EndDrawing", {}),
+        windowShouldClose = loadLibraryFunc(raylib, "u8", "WindowShouldClose", {}),
+        drawFPS = loadLibraryFunc(raylib, "void", "DrawFPS", {"i32", "i32"}),
+        setTargetFPS = loadLibraryFunc(raylib, "void", "SetTargetFPS", {"i32"}),
+        getScreenWidth = loadLibraryFunc(raylib, "i32", "GetScreenWidth", {}),
+        getScreenHeight = loadLibraryFunc(raylib, "i32", "GetScreenHeight", {}),
+        drawText = loadLibraryFunc(raylib, "void", "DrawText", {"pointer", "i32", "i32", "i32", TColor}),
+        clearBackground = loadLibraryFunc(raylib, "void", "ClearBackground", {TColor}),
+    };
+end
+
+
+def raylibExample()
+    rl := loadRaylib();
     
-    // drawText := loadLibraryFunc(raylib, "void", "DrawText", {"pointer", "int", "int", "int", "color"});
-
-    clearBackground := loadLibraryFunc(raylib, "void", "ClearBackground", {Color});
-
-    initWindow(800, 600, "hello from AinScript!");
+    rl.initWindow(800, 600, "hello from AinScript!");
     setTargetFPS(60);
 
-    while !windowShouldClose()
+    text_x := 100;
+    text_y := 100;
+
+    scr_w := getScreenWidth();
+    scr_h := getScreenHeight();
+
+    while windowShouldClose() == 0
         beginDrawing();
-        clearBackground(0, 0, 0, 255);
+        clearBackground(Color(18, 18, 18, 255));
+        drawText("Hello From AinScript!", text_x, text_y, 28, Color(255, 255, 255, 255));
+        println(text_w, text_h);
         drawFPS(16, 16);
         endDrawing();
     end
