@@ -8,6 +8,8 @@ import "core:time"
 import "core:strings"
 import "core:dynlib"
 
+void :: struct {}
+
 Interpreter :: struct {
     // scopes: [dynamic]core.Scope,
     ret_value: core.Value,
@@ -15,43 +17,41 @@ Interpreter :: struct {
     should_return: bool,
     curr_scope: ^core.Scope,
     ffi_func_decls: [dynamic]FFIFuncDecl,
+    scopes: map[^core.Scope]void,
+    heap_allocated_values: map[rawptr]core.Value,
+    functions: map[^core.Func]void,
+    marked_things: map[rawptr]void,
+    call_stack: [dynamic]^core.Scope,
+    prev_alloc_count: uint,
 }
 
-makeScope :: proc(parent: ^core.Scope) -> ^core.Scope {
+makeScope :: proc(intr: ^Interpreter, parent: ^core.Scope) -> ^core.Scope {
     scope := new(core.Scope)
     scope.parent = parent
+    intr.scopes[scope] = {}
     return scope
 }
 
-deleteScope :: proc(s: ^core.Scope) {
-    for name, val in s.vars {
-        deleteValue(val)
-    }
+deleteScope :: proc(intr: ^Interpreter, s: ^core.Scope) {
+    delete_key(&intr.scopes, s)
     delete(s.vars)
     free(s)
 }
 
 pushScope :: proc(intr: ^Interpreter) {
-    scope := makeScope(intr.curr_scope)
-    scope.ref_count = 1
+    scope := makeScope(intr, intr.curr_scope)
     intr.curr_scope = scope
 }
 
 popScope :: proc(intr: ^Interpreter) {
-    parent := intr.curr_scope.parent
-    intr.curr_scope.ref_count -= 1
-
-    if intr.curr_scope.ref_count == 0 {
-        deleteScope(intr.curr_scope)
-    }
-
-    intr.curr_scope = parent
+    intr.curr_scope = intr.curr_scope.parent
 }
 
 interpretFile :: proc(file: core.File) {
     intr : Interpreter
     intr.ret_value = makeValue_Nil()
     pushScope(&intr)
+    append(&intr.call_stack, intr.curr_scope)
 
     for stmt in file.statements {
         if !interpretStmt(&intr, stmt) {
@@ -75,7 +75,6 @@ findScopeThatHasVar :: proc(intr: ^Interpreter, var_name: string) -> ^core.Scope
 
 @(require_results)
 defineVariable :: proc(intr: ^Interpreter, loc: core.Location, name: string, val: core.Value) -> bool {
-    increaseValueRefCount(val)
     is_exists := findScopeThatHasVar(intr, name) == currScope(intr)
     if is_exists {
         reportError(loc, "variable with name '%s' already exists", name) or_return
@@ -107,6 +106,15 @@ findVar :: proc(intr: ^Interpreter, loc: core.Location, name: string) -> (val: c
 
 @(require_results)
 interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
+    if intr.prev_alloc_count + 1000 < len(intr.heap_allocated_values) {
+        // fmt.println("GC START:")
+        // fmt.printfln("allocated values: %d\nallocated scopes: %d\nallocated funcs: %d", len(intr.heap_allocated_values), len(intr.scopes), len(intr.functions))
+        runGC(intr)
+        // fmt.println("GC END:")
+        // fmt.printfln("allocated values: %d\nallocated scopes: %d\nallocated funcs: %d", len(intr.heap_allocated_values), len(intr.scopes), len(intr.functions))
+        intr.prev_alloc_count = len(intr.heap_allocated_values)
+    }
+
     switch v in stmt.vart {
     case core.IfStmt:
         cond_res := interpretExpr(intr, v.cond) or_return
@@ -161,17 +169,10 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
             if intr.should_return do return true
         }
     case core.FuncStmt:
-        func := makeValue_Func(v.name, v.params, v.body, currScopeInc(intr), v.is_builtin)
+        func := makeValue_Func(intr, v.name, v.params, v.body, intr.curr_scope, v.is_builtin)
         defineVariable(intr, stmt.loc, v.name, func) or_return
     }
     return true
-}
-
-currScopeInc :: proc(intr: ^Interpreter) -> ^core.Scope {
-    for scope := intr.curr_scope; scope != nil; scope = scope.parent {
-        scope.ref_count += 1
-    }
-    return intr.curr_scope
 }
 
 interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value, ok: bool) {
@@ -202,7 +203,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
             fields[i].name = e.fields[i].name
             fields[i].value = interpretExpr(intr, e.fields[i].value) or_return
         }
-        return makeValue_Struct(fields), true
+        return makeValue_Struct(intr, fields), true
     case core.UnaryExpr:
         val := interpretExpr(intr, e.expr) or_return
         switch e.op {
@@ -257,12 +258,21 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
     case core.BinaryExpr:
         left := interpretExpr(intr, e.left) or_return
         right := interpretExpr(intr, e.right) or_return
+
+        #partial switch e.op {
+        case .Equal:
+            return makeValue_Bool(valuesEql(left, right)), true
+        case .NotEqual:
+            return makeValue_Bool(!valuesEql(left, right)), true
+        case:
+        }
+
         a, is_a_num := left.(core.Number)
         b, is_b_num := right.(core.Number)
 
         num: core.Number
         if is_a_num && is_b_num {
-            switch e.op {
+            #partial switch e.op {
             case .Plus:
                 num.numeral = a.numeral * b.denominator + b.numeral * a.denominator
                 num.denominator = a.denominator * b.denominator
@@ -287,10 +297,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 return makeValue_Bool(a.numeral * b.denominator <= b.numeral * a.denominator), true
             case .GreaterEqual:
                 return makeValue_Bool(a.numeral * b.denominator >= b.numeral * a.denominator), true
-            case .Equal:
-                return makeValue_Bool(a.numeral * b.denominator == b.numeral * a.denominator), true
-            case .NotEqual:
-                return makeValue_Bool(a.numeral * b.denominator != b.numeral * a.denominator), true
+            case:
             }
         } else {
             reportError(expr.loc, "operator '%v' expects number operands, but got '%s' and '%s'", e.op, formatType(a), formatType(b)) or_return
@@ -304,7 +311,9 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
             for value in lit_expr.values {
                 append(&values, interpretExpr(intr, value) or_return)
             }
-            return makeValue_Array(values), true
+            return makeValue_Array(intr, values), true
+        case core.Nil:
+            return lit_expr, true
         case core.String:
             return lit_expr, true 
         case core.Number:
@@ -314,7 +323,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
         }
     case core.CallExpr:
         maybe_func := interpretExpr(intr, e.callable) or_return
-        func, is_func := maybe_func.(core.Func)
+        func, is_func := maybe_func.(^core.Func)
 
         if is_func {
             has_rest_param := len(func.params) != 0 && func.params[len(func.params)-1].is_rest
@@ -335,18 +344,20 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                         arg := interpretExpr(intr, e.args[i + params_len]) or_return
                         rest_args[i] = arg
                     }
-                    rest_arr := makeValue_Array(rest_args)
+                    rest_arr := makeValue_Array(intr, rest_args)
                     args[len(func.params) - 1] = rest_arr
                 }
 
 
                 // create new scope
+                append(&intr.call_stack, intr.curr_scope)
+                defer pop(&intr.call_stack)
+
                 prev_scope := intr.curr_scope
                 defer intr.curr_scope = prev_scope
                 intr.curr_scope = func.scope
 
                 pushScope(intr); defer popScope(intr)
-
 
                 // define params
                 for arg, i in args {

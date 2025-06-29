@@ -139,9 +139,12 @@ def loadRaylib()
         unloadLibrary(raylib);
     end
 
+    initWindow := loadLibraryFunc(raylib, "void", "InitWindow", {"i32", "i32", "pointer"});
+    println("22222");
+
     return #{
         Color = Color,
-        initWindow = loadLibraryFunc(raylib, "void", "InitWindow", {"i32", "i32", "pointer"}),
+        initWindow = initWindow,
         quitWindow = loadLibraryFunc(raylib, "void", "CloseWindow", {}),
         beginDrawing = loadLibraryFunc(raylib, "void", "BeginDrawing", {}),
         endDrawing = loadLibraryFunc(raylib, "void", "EndDrawing", {}),
@@ -152,16 +155,20 @@ def loadRaylib()
         getScreenHeight = loadLibraryFunc(raylib, "i32", "GetScreenHeight", {}),
         drawText = loadLibraryFunc(raylib, "void", "DrawText", {"pointer", "i32", "i32", "i32", TColor}),
         clearBackground = loadLibraryFunc(raylib, "void", "ClearBackground", {TColor}),
+        drawRectangle = loadLibraryFunc(raylib, "void", "DrawRectangle", {"i32", "i32", "i32", "i32", TColor}),
+        getMouseX = loadLibraryFunc(raylib, "i32", "GetMouseX", {}),
+        getMouseY = loadLibraryFunc(raylib, "i32", "GetMouseY", {}),
         unloadRaylib = unloadRaylib,
     };
 end
 
 
 def raylibExample()
+    println("11111111");
     rl := loadRaylib();
-    
+
     rl.initWindow(800, 600, "hello from AinScript!");
-    rl.setTargetFPS(60);
+    // rl.setTargetFPS(120);
 
     text_x := 100;
     text_y := 100;
@@ -171,8 +178,13 @@ def raylibExample()
 
     while rl.windowShouldClose() == 0
         rl.beginDrawing();
-        rl.clearBackground(rl.Color(18, 18, 18, 255));
-        rl.drawText("Hello From AinScript!", text_x, text_y, 28, rl.Color(255, 255, 255, 255));
+        c := rl.Color(18, 18, 18, 255);
+        rl.clearBackground(c);
+        c2 := rl.Color(255, 255, 255, 255);
+        rl.drawText("Hello From AinScript!", text_x, text_y, 28, c2);
+        c3 := rl.Color(0, 255, 255, 255);
+        rl.drawRectangle(rl.getMouseX(), rl.getMouseY(), 100, 100, c3);
+        // println(rl.getMouseX(), rl.getMouseY(), c3);
         rl.drawFPS(16, 16);
         rl.endDrawing();
     end
@@ -181,27 +193,41 @@ def raylibExample()
     rl.unloadRaylib();
 end
 
-def test2(data)
-    return data;
+def linkedList()
+    def makeNode(val next)
+        return #{
+            val = val,
+            next = next,
+        };
+    end
+
+    root := makeNode(1, nil);
+    root = makeNode(2, root);
+    root = makeNode(3, root);
+    root = makeNode(4, root);
+    root = makeNode(5, root);
+    root = makeNode(6, root);
+
+    while root != nil
+        // println(root.val);
+        root = root.next;
+    end
 end
 
-def test(data)
-    println(data);
-    test2(data);
-    return data;
-end
-
-def test3(..data)
+def test()
 end
 
 def main()
-    D := 123;
-    variables();
-    functions();
-    closure();
-    strings();
-    arrays();
-    structs();
+    // variables();
+    // functions();
+    // closure();
+    // strings();
+    // arrays();
+    // structs();
+    x := 123;
+    // while true
+        // linkedList();
+    // end
     raylibExample();
 end
 

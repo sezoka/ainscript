@@ -101,7 +101,7 @@ convertASValueToCValuePtr :: proc(
         case:
             reportError(loc, "can't convert AinScript number to '%s'", ffi.getTypeName(ffi_target_type.type)) or_return
         }
-    case core.Func:
+    case ^core.Func:
         reportError(loc, "can't convert AinScript function to any c value") or_return
     case core.Nil:
         reportError(loc, "can't convert AinScript nil to any c value") or_return

@@ -2,24 +2,55 @@ package aininterpreter
 
 import "../core"
 import "core:fmt"
+import "core:log"
+import "core:reflect"
 import "core:strings"
 
 makeValue_Pointer :: proc(ptr: rawptr) -> core.Value {
     return ptr
 }
 
-makeValue_Array :: proc(values: [dynamic]core.Value) -> core.Value {
+makeValue_Array :: proc(intr: ^Interpreter, values: [dynamic]core.Value) -> core.Value {
     arr := new(core.Array)
-    for &v in values {
-        increaseValueRefCount(v)
-    }
     arr.values = values
+    intr.heap_allocated_values[arr] = arr
     return arr
 }
 
-makeValue_Struct :: proc(fields: []core.StructField) -> core.Value {
+unionsEql :: proc(a: any, b: any) -> bool {
+    return reflect.union_variant_typeid(a) == reflect.union_variant_typeid(b)
+}
+
+valuesEql :: proc(a: core.Value, b: core.Value) -> bool {
+    if unionsEql(a, b) {
+        switch v in a {
+        case core.Number:
+            a := v
+            b := b.(core.Number)
+            return a.numeral * b.denominator == b.numeral * a.denominator
+        case core.Nil:
+            return true
+        case core.Bool:
+            return v == b.(core.Bool)
+        case core.String:
+            return v == b.(core.String)
+        case ^core.Array:
+            return v == b.(^core.Array)
+        case ^core.Struct:
+            return v == b.(^core.Struct)
+        case ^core.Func:
+            return v == b.(^core.Func)
+        case rawptr:
+            return v == b.(rawptr)
+        }
+    }
+    return false
+}
+
+makeValue_Struct :: proc(intr: ^Interpreter, fields: []core.StructField) -> core.Value {
     strct := new(core.Struct)
     strct.fields = fields
+    intr.heap_allocated_values[strct] = strct
     return strct
 }
 
@@ -35,58 +66,41 @@ makeValue_Nil :: proc() -> core.Value {
     return core.Nil(nil)
 }
 
-makeValue_Func :: proc(name: string,
+makeValue_Func :: proc(
+    intr: ^Interpreter,
+    name: string,
     params: []core.FuncParam,
     body: ^core.Stmt,
     scope: ^core.Scope,
     is_builtin := false,
 ) -> core.Value {
-    return core.Func{ 
-        name = name,
-        params = params,
-        body = body,
-        is_builtin = is_builtin,
-        scope = scope
-    }
+    func := new(core.Func)
+    func.name = name
+    func.params = params
+    func.body = body
+    func.is_builtin = is_builtin
+    func.scope = scope
+
+    intr.functions[func] = {}
+
+    return func
 }
 
-increaseValueRefCount :: proc(val: core.Value) {
+deleteValue :: proc(intr: ^Interpreter, val: core.Value) {
     switch &v in val {
     case core.Number, core.Nil, core.Bool, core.String, rawptr:
         return
     case ^core.Array:
-        v.ref_count += 1
+        delete(v.values)
+        delete_key(&intr.heap_allocated_values, v)
+        free(v)
     case ^core.Struct:
-        v.ref_count += 1
-    case core.Func:
-    }
-}
-
-deleteValue :: proc(val: core.Value) {
-    switch &v in val {
-    case core.Number, core.Nil, core.Bool, core.String, rawptr:
-        return
-    case ^core.Array:
-        assert(v.ref_count != 0)
-        v.ref_count -= 1
-        if v.ref_count <= 0 {
-            for item in v.values {
-                deleteValue(item)
-            }
-            delete(v.values)
-            free(v)
-        }
-    case ^core.Struct:
-        assert(v.ref_count != 0)
-        v.ref_count -= 1
-        if v.ref_count <= 0 {
-            for field in v.fields {
-                deleteValue(field.value)
-            }
-            delete(v.fields)
-            free(v)
-        }
-    case core.Func:
+        delete(v.fields)
+        delete_key(&intr.heap_allocated_values, v)
+        free(v)
+    case ^core.Func:
+        delete_key(&intr.functions, v)
+        free(v)
     }
 }
 
@@ -102,7 +116,7 @@ formatType :: proc(val: core.Value) -> string {
         switch v in val {
         case core.Number:
             strings.write_string(b, "number")
-        case core.Func:
+        case ^core.Func:
             strings.write_string(b, formatValue(val))
         case core.Nil:
             strings.write_string(b, "nil")
@@ -171,7 +185,7 @@ formatValueImpl :: proc(b: ^strings.Builder, val: core.Value) {
         } else {
             strings.write_f64(b, float, 'f')
         }
-    case core.Func:
+    case ^core.Func:
         strings.write_string(b, "def ")
         strings.write_string(b, v.name)
         strings.write_string(b, "(")

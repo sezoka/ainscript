@@ -78,6 +78,7 @@ LiteralExpr :: union {
     Number,
     Bool,
     ArrayExpr,
+    Nil,
 }
 
 ArrayExpr :: struct {

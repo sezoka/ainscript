@@ -337,6 +337,8 @@ parsePrimary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
         return makeExpr(tok.loc, core.LiteralExpr(false))
     case .String:
         return makeExpr(tok.loc, core.LiteralExpr(core.String(tok.value.(string))))
+    case .Nil:
+        return makeExpr(tok.loc, core.LiteralExpr(core.Nil(nil)))
     case .LeftBrace:
         values : [dynamic]^core.Expr
         for peek(p).kind != .RightBrace {

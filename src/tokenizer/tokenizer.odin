@@ -48,6 +48,7 @@ TokenKind :: enum {
     DotDot,
     While,
     SharpBrace,
+    Nil,
 }
 
 TokenValue :: union {
@@ -76,6 +77,7 @@ makeToken :: proc(t: ^Tokenizer, kind: TokenKind, value: TokenValue = {}) -> (To
 makeKeywordsMap :: proc() -> (keywords: map[string]TokenKind) {
     keywords["if"] = .If
     keywords["def"] = .Def
+    keywords["nil"] = .Nil
     keywords["block"] = .Block
     keywords["while"] = .While
     keywords["return"] = .Return

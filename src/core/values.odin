@@ -24,16 +24,15 @@ Bool :: bool
 
 Scope :: struct {
     vars: map[string]Value,
-    ref_count: int,
     parent: ^Scope,
 }
 
 Value :: union {
     Number,
-    Func,
     Nil,
     Bool,
     String,
+    ^Func,
     ^Array,
     ^Struct,
     rawptr,
@@ -53,10 +52,10 @@ ValueType :: enum {
 valueToValueType :: proc(v: Value) -> ValueType {
     switch v in v {
     case Number: return .Number
-    case Func: return .Func
     case Nil: return .Nil
     case Bool: return .Bool
     case String: return .String
+    case ^Func: return .Func
     case ^Array: return .Array
     case ^Struct: return .Struct
     case rawptr: return .rawptr
@@ -66,7 +65,6 @@ valueToValueType :: proc(v: Value) -> ValueType {
 
 Array :: struct {
     values: [dynamic]Value,
-    ref_count: int,
 }
 
 String :: string
