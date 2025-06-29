@@ -365,48 +365,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 }
 
                 if func.is_builtin {
-                    if func.name == "println" || func.name == "print" {
-                        val := currScope(intr).vars["val"]
-                        val_arr := val.(^core.Array)
-                        for val, i in val_arr.values {
-                            printValue(val)
-                            if i != len(val_arr.values) - 1 {
-                                fmt.print(" ")
-                            }
-                        }
-                        if func.name == "println" {
-                            fmt.println()
-                        }
-                        return makeValue_Nil(), true
-                    } else if func.name == "timestamp" {
-                        numeral : i64 = time.to_unix_nanoseconds(time.now())
-                        return core.Number{numeral, 1}, true
-                    } else  if func.name == "loadLibrary" {
-                        path := currScope(intr).vars["path"]
-                        path_str, is_str := path.(core.String)
-                        if is_str {
-                            lib := loadLibrary(e.callable.loc, string(path_str)) or_return
-                            return makeValue_Pointer(rawptr(lib)), true
-                        } else {
-                            reportError(e.callable.loc, "builtin 'loadLibrary' expects library path as string") or_return
-                        }
-                    } else  if func.name == "unloadLibrary" {
-                        lib_ptr := currScope(intr).vars["lib_ptr"]
-                        ptr, is_ptr := lib_ptr.(rawptr)
-                        if is_ptr {
-                            dynlib.unload_library(dynlib.Library(ptr)) or_return
-                            return makeValue_Nil(), true
-                        } else {
-                            reportError(e.callable.loc, "builtin 'unloadLibrary' expects library pointer") or_return
-                        }
-                    } else if func.name == "prepareLibraryFunc" {
-                        return handlePrepareLibraryFuncBuiltin(intr, e)
-                    } else if func.name == "callLibraryFunc" {
-                        return handleCallLibraryFuncBuiltin(intr, e)
-                    } else {
-                        log.error("unhandled")
-                        return {}, false
-                    }
+                    return handleBuiltins(intr, e, func)
                 } else {
                     prev_is_in_func := intr.is_in_func
                     intr.should_return = false
@@ -438,6 +397,70 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
     }
 
     log.error("unhandled")
+    return {}, false
+}
+
+handleBuiltins :: proc(intr: ^Interpreter, e: core.CallExpr, func: ^core.Func) -> (ret_val: core.Value, ok: bool) {
+    if func.name == "println" || func.name == "print" {
+        val := currScope(intr).vars["val"]
+        val_arr := val.(^core.Array)
+        for val, i in val_arr.values {
+            printValue(val)
+            if i != len(val_arr.values) - 1 {
+                fmt.print(" ")
+            }
+        }
+        if func.name == "println" {
+            fmt.println()
+        }
+        return makeValue_Nil(), true
+    } else if func.name == "timestamp" {
+        numeral : i64 = time.to_unix_nanoseconds(time.now())
+        return core.Number{numeral, 1}, true
+    } else  if func.name == "loadLibrary" {
+        path := currScope(intr).vars["path"]
+        path_str, is_str := path.(core.String)
+        if is_str {
+            lib := loadLibrary(e.callable.loc, string(path_str)) or_return
+            return makeValue_Pointer(rawptr(lib)), true
+        } else {
+            reportError(e.callable.loc, "builtin 'loadLibrary' expects library path as string") or_return
+        }
+    } else if func.name == "unloadLibrary" {
+        lib_ptr := currScope(intr).vars["lib_ptr"]
+        ptr, is_ptr := lib_ptr.(rawptr)
+        if is_ptr {
+            dynlib.unload_library(dynlib.Library(ptr)) or_return
+            return makeValue_Nil(), true
+        } else {
+            reportError(e.callable.loc, "builtin 'unloadLibrary' expects library pointer") or_return
+        }
+    } else if func.name == "prepareLibraryFunc" {
+        return handlePrepareLibraryFuncBuiltin(intr, e)
+    } else if func.name == "callLibraryFunc" {
+        return handleCallLibraryFuncBuiltin(intr, e)
+    } else if func.name == "import" {
+        return handleImportBuiltin(intr, e)
+    } else if func.name == "error" {
+        path_val := currScope(intr).vars["msg"]
+        err_msg := checkType(
+            intr,
+            e.args[0].loc,
+            path_val,
+            core.String,
+            "error function expects error message"
+        ) or_return
+        reportError(e.callable.loc, err_msg) or_return
+        return {}, false
+    }
+
+    log.error("unhandled")
+    return {}, false
+}
+
+handleImportBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (ret_val: core.Value, ok: bool) {
+    path_val := currScope(intr).vars["path"]
+    func_handle := checkType(intr, call.args[0].loc, path_val, core.String, "import expects path string") or_return
     return {}, false
 }
 

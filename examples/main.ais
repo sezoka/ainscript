@@ -7,6 +7,9 @@ builtin loadLibrary(path) end
 builtin unloadLibrary(lib_ptr) end
 builtin prepareLibraryFunc(lib_ptr ret_type name params) end
 builtin callLibraryFunc(func_handle params) end
+builtin error(msg) end
+
+builtin import(path) end
 
 def loadLibraryFunc(lib_ptr ret_type name params)
     func_handle := prepareLibraryFunc(lib_ptr, ret_type, name, params);
@@ -15,6 +18,13 @@ def loadLibraryFunc(lib_ptr ret_type name params)
     end
     return call;
 end
+
+def assert(cond msg)
+    if !cond
+        error(msg);
+    end
+end
+
 // prelude-end
 
 def variables()
@@ -24,6 +34,8 @@ def variables()
     x := 123 * 6;
     y := 2 + 2 * 2;
     println(x + y);
+    assert(2 + 2 == 4, "2 + 2 is 4");
+    assert(0.2 + 0.1 == 0.3, "math is broken");
 
     block
         x := 2;
@@ -214,21 +226,27 @@ def linkedList()
     end
 end
 
-def test()
+def fileImportTest()
+    lib := import("./lib.ais");
+    lib.hello();
+end
+
+def userError()
+    error("and now program should crash with this error message");
 end
 
 def main()
-    // variables();
-    // functions();
-    // closure();
-    // strings();
-    // arrays();
-    // structs();
+    variables();
+    functions();
+    closure();
+    strings();
+    arrays();
+    structs();
     x := 123;
-    // while true
-        // linkedList();
-    // end
-    raylibExample();
+    linkedList();
+    // fileImportTest();
+    // raylibExample();
+    userError();
 end
 
 main();

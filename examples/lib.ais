@@ -1,0 +1,10 @@
+export := {};
+
+def hello()
+    println("hello from lib.ais");
+
+    // color := struct {};
+    // map := map {};
+end
+
+export.hello = hello;
