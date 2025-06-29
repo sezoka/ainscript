@@ -59,8 +59,8 @@ markScopes :: proc(intr: ^Interpreter) {
     for scope in intr.call_stack {
         markScope(intr, scope)
     }
-    markScope(intr, intr.curr_scope)
-    markValue(intr, intr.ret_value)
+    markScope(intr, intr.frame.curr_scope)
+    markValue(intr, intr.frame.ret_value)
 }
 
 markScope :: proc(intr: ^Interpreter, scope: ^core.Scope) {
@@ -79,6 +79,7 @@ markValue :: proc(intr: ^Interpreter, val: core.Value) {
     case core.Nil:
     case core.Bool:
     case core.String:
+    case core.Module:
     case ^core.Func:
         markScope(intr, v.scope)
         markThing(intr, v)

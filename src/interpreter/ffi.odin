@@ -74,6 +74,8 @@ convertASValueToCValuePtr :: proc(
     ffi_target_type: ^ffi.ffi_type
 ) -> (res: rawptr, ok: bool) {
     switch v in value {
+    case core.Module:
+        reportError(loc, "can't convert AinScript module to any C value") or_return
     case core.Number:
         switch ffi_target_type.type {
         case ffi.FFI_TYPE_SINT32:
@@ -102,9 +104,9 @@ convertASValueToCValuePtr :: proc(
             reportError(loc, "can't convert AinScript number to '%s'", ffi.getTypeName(ffi_target_type.type)) or_return
         }
     case ^core.Func:
-        reportError(loc, "can't convert AinScript function to any c value") or_return
+        reportError(loc, "can't convert AinScript function to any C value") or_return
     case core.Nil:
-        reportError(loc, "can't convert AinScript nil to any c value") or_return
+        reportError(loc, "can't convert AinScript nil to any C value") or_return
     case core.Bool:
         switch ffi_target_type.type {
         case ffi.FFI_TYPE_SINT32:

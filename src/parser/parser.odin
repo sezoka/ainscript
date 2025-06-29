@@ -12,7 +12,7 @@ Parser :: struct {
     curr: int,
 }
 
-parseFile :: proc(tokens: []tokenizer.Token) -> (file: core.File, ok: bool) {
+parseFile :: proc(tokens: []tokenizer.Token, path: string) -> (file: core.File, ok: bool) {
     parser : Parser
     parser.tokens = tokens
 
@@ -26,6 +26,7 @@ parseFile :: proc(tokens: []tokenizer.Token) -> (file: core.File, ok: bool) {
 
     shrink(&stmts)
     file.statements = stmts[:]
+    file.path = path
     return file, true
 }
 

@@ -7,15 +7,33 @@ import "core:fmt"
 import "core:time"
 import "core:strings"
 import "core:dynlib"
+import "core:path/filepath"
+import "../tokenizer"
+import "../parser"
 
 void :: struct {}
 
-Interpreter :: struct {
-    // scopes: [dynamic]core.Scope,
+FileState :: struct {
+    ast: core.File,
+    frame: StackFrame,
+}
+
+StackFrame :: struct {
+    curr_scope: ^core.Scope,
     ret_value: core.Value,
     is_in_func: bool,
     should_return: bool,
-    curr_scope: ^core.Scope,
+    curr_file_path: string,
+}
+
+Interpreter :: struct {
+    frame: StackFrame,
+    // curr_scope: ^core.Scope,
+    // ret_value: core.Value,
+    // is_in_func: bool,
+    // should_return: bool,
+    // curr_file_path: string,
+
     ffi_func_decls: [dynamic]FFIFuncDecl,
     scopes: map[^core.Scope]void,
     heap_allocated_values: map[rawptr]core.Value,
@@ -23,6 +41,7 @@ Interpreter :: struct {
     marked_things: map[rawptr]void,
     call_stack: [dynamic]^core.Scope,
     prev_alloc_count: uint,
+    files: map[string]FileState,
 }
 
 makeScope :: proc(intr: ^Interpreter, parent: ^core.Scope) -> ^core.Scope {
@@ -39,19 +58,23 @@ deleteScope :: proc(intr: ^Interpreter, s: ^core.Scope) {
 }
 
 pushScope :: proc(intr: ^Interpreter) {
-    scope := makeScope(intr, intr.curr_scope)
-    intr.curr_scope = scope
+    scope := makeScope(intr, intr.frame.curr_scope)
+    intr.frame.curr_scope = scope
 }
 
 popScope :: proc(intr: ^Interpreter) {
-    intr.curr_scope = intr.curr_scope.parent
+    intr.frame.curr_scope = intr.frame.curr_scope.parent
 }
 
-interpretFile :: proc(file: core.File) {
+interpretMainFile :: proc(file: core.File) {
     intr : Interpreter
-    intr.ret_value = makeValue_Nil()
+    intr.frame.ret_value = makeValue_Nil()
+    intr.frame.curr_file_path = file.path
+
+    parseAndInterpretFile(&intr, "./core/prelude.ais");
+
     pushScope(&intr)
-    append(&intr.call_stack, intr.curr_scope)
+    append(&intr.call_stack, intr.frame.curr_scope)
 
     for stmt in file.statements {
         if !interpretStmt(&intr, stmt) {
@@ -60,12 +83,49 @@ interpretFile :: proc(file: core.File) {
     }
 }
 
+interpretFile :: proc(intr: ^Interpreter, file: core.File) {
+    intr : Interpreter
+    intr.frame.curr_file_path = file.path
+    intr.frame.ret_value = makeValue_Nil()
+
+    pushScope(&intr)
+    append(&intr.call_stack, intr.frame.curr_scope)
+
+    for stmt in file.statements {
+        if !interpretStmt(&intr, stmt) {
+            return
+        }
+    }
+}
+
+parseAndInterpretFile :: proc(intr: ^Interpreter, path: string, loc: Maybe(core.Location) = nil) -> (ok: bool) {
+    pushScope(intr)
+    append(&intr.call_stack, intr.frame.curr_scope)
+
+    src, read_ok := core.readFile(path, loc)
+    if !read_ok do return
+
+    tokens, tokenize_ok := tokenizer.tokenize(string(src), path)
+    if !tokenize_ok do return
+
+    file_ast, parse_ok := parser.parseFile(tokens, path)
+    if !parse_ok do return
+
+    for stmt in file_ast.statements {
+        if !interpretStmt(intr, stmt) {
+            return
+        }
+    }
+
+    return true
+}
+
 currScope :: proc(intr: ^Interpreter) -> ^core.Scope {
-    return intr.curr_scope
+    return intr.frame.curr_scope
 }
 
 findScopeThatHasVar :: proc(intr: ^Interpreter, var_name: string) -> ^core.Scope {
-    for scope := intr.curr_scope; scope != nil; scope = scope.parent {
+    for scope := intr.frame.curr_scope; scope != nil; scope = scope.parent {
         if var_name in scope.vars {
             return scope
         }
@@ -143,14 +203,18 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
             }
         }
     case core.RetStmt:
-        if v.expr == nil {
-            intr.ret_value = makeValue_Nil()
-            intr.should_return = true
-            return true
+        if intr.frame.is_in_func {
+            if v.expr == nil {
+                intr.frame.ret_value = makeValue_Nil()
+                intr.frame.should_return = true
+                return true
+            } else {
+                intr.frame.ret_value = interpretExpr(intr, v.expr) or_return
+                intr.frame.should_return = true
+                return true
+            }
         } else {
-            intr.ret_value = interpretExpr(intr, v.expr) or_return
-            intr.should_return = true
-            return true
+            reportError(stmt.loc, "can't return from top-level code") or_return
         }
     case core.ExprStmt:
         interpretExpr(intr, v.expr) or_return
@@ -166,10 +230,10 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
 
         for stmt in v.stmts {
             interpretStmt(intr, stmt) or_return
-            if intr.should_return do return true
+            if intr.frame.should_return do return true
         }
     case core.FuncStmt:
-        func := makeValue_Func(intr, v.name, v.params, v.body, intr.curr_scope, v.is_builtin)
+        func := makeValue_Func(intr, v.name, v.params, v.body, intr.frame.curr_scope, v.is_builtin)
         defineVariable(intr, stmt.loc, v.name, func) or_return
     }
     return true
@@ -350,12 +414,12 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
 
 
                 // create new scope
-                append(&intr.call_stack, intr.curr_scope)
+                append(&intr.call_stack, intr.frame.curr_scope)
                 defer pop(&intr.call_stack)
 
-                prev_scope := intr.curr_scope
-                defer intr.curr_scope = prev_scope
-                intr.curr_scope = func.scope
+                prev_scope := intr.frame.curr_scope
+                defer intr.frame.curr_scope = prev_scope
+                intr.frame.curr_scope = func.scope
 
                 pushScope(intr); defer popScope(intr)
 
@@ -367,16 +431,16 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 if func.is_builtin {
                     return handleBuiltins(intr, e, func)
                 } else {
-                    prev_is_in_func := intr.is_in_func
-                    intr.should_return = false
-                    defer intr.should_return = false
-                    defer intr.is_in_func = prev_is_in_func
-                    intr.is_in_func = true
+                    prev_is_in_func := intr.frame.is_in_func
+                    intr.frame.should_return = false
+                    defer intr.frame.should_return = false
+                    defer intr.frame.is_in_func = prev_is_in_func
+                    intr.frame.is_in_func = true
 
                     interpretStmt(intr, func.body) or_return
 
-                    ret_val := intr.ret_value
-                    intr.ret_value = makeValue_Nil()
+                    ret_val := intr.frame.ret_value
+                    intr.frame.ret_value = makeValue_Nil()
 
                     return ret_val, true
                 }
@@ -460,8 +524,32 @@ handleBuiltins :: proc(intr: ^Interpreter, e: core.CallExpr, func: ^core.Func) -
 
 handleImportBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (ret_val: core.Value, ok: bool) {
     path_val := currScope(intr).vars["path"]
-    func_handle := checkType(intr, call.args[0].loc, path_val, core.String, "import expects path string") or_return
-    return {}, false
+    path_str := checkType(intr, call.args[0].loc, path_val, core.String, "import expects path string") or_return
+    path, path_ok := core.relToAbsFilePath(filepath.dir(intr.frame.curr_file_path), path_str) 
+    if path_ok {
+        if path in intr.files {
+            return makeValue_Module(path), true
+        } else {
+            src, ok := core.readFile(path, call.callable.loc)
+            if !ok do return
+
+            tokens, tokenize_ok := tokenizer.tokenize(string(src), path)
+            if !tokenize_ok do return
+
+            file_ast, parse_ok := parser.parseFile(tokens, path)
+            if !parse_ok do return
+
+            intr.files[path] = FileState {
+                ast = file_ast,
+                // root_scope = nil,
+            }
+
+            return makeValue_Module(path), true
+        }
+    } else {
+        reportError(call.args[0].loc, "invalid file path") or_return
+        return {}, false
+    }
 }
 
 handleCallLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (ret_val: core.Value, ok: bool) {
@@ -564,7 +652,7 @@ checkType :: proc(intr: ^Interpreter, loc: core.Location, value: core.Value, $T:
 
 printScopes :: proc(intr: ^Interpreter) {
     fmt.println("BEGIN")
-    for scope := intr.curr_scope; scope != nil; scope = scope.parent {
+    for scope := intr.frame.curr_scope; scope != nil; scope = scope.parent {
         // fmt.println("  ", scope.ref_count)
         // for key, value in scope.vars {
         //     fmt.println("  ", key, scope.ref_count)

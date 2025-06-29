@@ -25,10 +25,12 @@ printMsg :: proc(level: LogLevel, loc: Maybe(Location), msg: string, args: ..any
     loc, is_loc := loc.?
     if is_loc {
         strings.write_string(&builder, "(")
+        strings.write_string(&builder, loc.file)
+        strings.write_string(&builder, ":")
         strings.write_int(&builder, loc.line)
         strings.write_string(&builder, ":")
         strings.write_int(&builder, loc.col)
-        strings.write_string(&builder, "): ")
+        strings.write_string(&builder, "):\n")
     } else {
         strings.write_string(&builder, ": ")
     }

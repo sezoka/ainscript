@@ -100,10 +100,10 @@ Tokenizer :: struct {
     keywords_map: map[string]TokenKind,
 }
 
-tokenize :: proc(src: string) -> ([]Token, bool) {
+tokenize :: proc(src: string, path: string) -> ([]Token, bool) {
     tkz : Tokenizer
     tkz.src = src
-    tkz.loc = {1, 1}
+    tkz.loc = {1, 1, path}
     tkz.keywords_map = makeKeywordsMap()
 
     tokens := make([dynamic]Token, context.allocator)

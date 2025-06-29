@@ -2,6 +2,7 @@ package aincore
 
 File :: struct {
     statements: []^Stmt,
+    path: string,
 }
 
 Stmt :: struct {

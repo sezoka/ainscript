@@ -1,32 +1,3 @@
-// prelude-start
-builtin println(..val) end
-builtin print(..val) end
-builtin timestamp() end
-
-builtin loadLibrary(path) end
-builtin unloadLibrary(lib_ptr) end
-builtin prepareLibraryFunc(lib_ptr ret_type name params) end
-builtin callLibraryFunc(func_handle params) end
-builtin error(msg) end
-
-builtin import(path) end
-
-def loadLibraryFunc(lib_ptr ret_type name params)
-    func_handle := prepareLibraryFunc(lib_ptr, ret_type, name, params);
-    def call(..params)
-        return callLibraryFunc(func_handle, params);
-    end
-    return call;
-end
-
-def assert(cond msg)
-    if !cond
-        error(msg);
-    end
-end
-
-// prelude-end
-
 def variables()
     println("VARIABLES");
     number := 123.456;
@@ -180,7 +151,7 @@ def raylibExample()
     rl := loadRaylib();
 
     rl.initWindow(800, 600, "hello from AinScript!");
-    // rl.setTargetFPS(120);
+    rl.setTargetFPS(120);
 
     text_x := 100;
     text_y := 100;
@@ -228,7 +199,10 @@ end
 
 def fileImportTest()
     lib := import("./lib.ais");
-    lib.hello();
+    println(lib);
+    lib2 := import("./lib.ais");
+    println(lib2);
+    // lib.hello();
 end
 
 def userError()
@@ -245,9 +219,10 @@ def main()
     x := 123;
     linkedList();
     // fileImportTest();
-    // raylibExample();
-    userError();
+    raylibExample();
+    // userError();
 end
 
 main();
+
 

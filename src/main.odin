@@ -3,6 +3,7 @@ package ains
 import "./core"
 import "./parser"
 import "core:os"
+import "core:os/os2"
 import "core:fmt"
 import "core:log"
 import "./tokenizer"
@@ -17,26 +18,22 @@ main :: proc() {
     }
     path := os.args[1]
 
-    src, ok := readFile(path)
+
+    src, ok := core.readFile(path)
     if !ok do return
 
-    tokens, tokenize_ok := tokenizer.tokenize(string(src))
+    abs_path, abs_ok := core.relToAbsFilePath("./", path)
+    assert(abs_ok)
+
+    tokens, tokenize_ok := tokenizer.tokenize(string(src), abs_path)
     if !tokenize_ok do return
 
-    // tokenizer.printTokens(tokens)
-    file_ast, parse_ok := parser.parseFile(tokens)
+    file_ast, parse_ok := parser.parseFile(tokens, abs_path)
     if !parse_ok do return
 
-    interpreter.interpretFile(file_ast)
+    exe_path, ok_exe_path := os2.get_executable_path(context.temp_allocator)
+    assert(ok)
+    os.set_current_directory(exe_path)
 
-    // fmt.println(file_ast)
-}
-
-readFile :: proc(path: string) -> ([]u8, bool) {
-    content, ok := os.read_entire_file(path, allocator=context.allocator)
-    if !ok {
-        core.printErr(nil, "failed to read file '%s'", path)
-        return {}, false
-    }
-    return content, true
+    interpreter.interpretMainFile(file_ast)
 }

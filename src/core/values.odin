@@ -35,8 +35,11 @@ Value :: union {
     ^Func,
     ^Array,
     ^Struct,
+    Module,
     rawptr,
 }
+
+Module :: distinct string
 
 ValueType :: enum {
     Number,
@@ -46,11 +49,13 @@ ValueType :: enum {
     String,
     Array,
     Struct,
+    Module,
     rawptr,
 }
 
 valueToValueType :: proc(v: Value) -> ValueType {
     switch v in v {
+    case Module: return .Module
     case Number: return .Number
     case Nil: return .Nil
     case Bool: return .Bool

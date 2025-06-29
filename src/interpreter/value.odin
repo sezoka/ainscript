@@ -10,6 +10,10 @@ makeValue_Pointer :: proc(ptr: rawptr) -> core.Value {
     return ptr
 }
 
+makeValue_Module :: proc(path: string) -> core.Value {
+    return core.Module(path)
+}
+
 makeValue_Array :: proc(intr: ^Interpreter, values: [dynamic]core.Value) -> core.Value {
     arr := new(core.Array)
     arr.values = values
@@ -24,6 +28,8 @@ unionsEql :: proc(a: any, b: any) -> bool {
 valuesEql :: proc(a: core.Value, b: core.Value) -> bool {
     if unionsEql(a, b) {
         switch v in a {
+        case core.Module:
+            return v == b.(core.Module)
         case core.Number:
             a := v
             b := b.(core.Number)
@@ -88,7 +94,7 @@ makeValue_Func :: proc(
 
 deleteValue :: proc(intr: ^Interpreter, val: core.Value) {
     switch &v in val {
-    case core.Number, core.Nil, core.Bool, core.String, rawptr:
+    case core.Number, core.Nil, core.Bool, core.String, core.Module, rawptr:
         return
     case ^core.Array:
         delete(v.values)
@@ -136,7 +142,10 @@ formatType :: proc(val: core.Value) -> string {
                 strings.write_string(b, " ")
             }
             strings.write_string(b, "}")
-
+        case core.Module:
+            strings.write_string(b, "module(")
+            strings.write_string(b, string(v))
+            strings.write_string(b, ")")
         case rawptr:
         }
     }
@@ -200,6 +209,10 @@ formatValueImpl :: proc(b: ^strings.Builder, val: core.Value) {
         strings.write_string(b, "nil")
     case core.Bool:
         strings.write_string(b, v ? "true" : "false")
+    case core.Module:
+        strings.write_string(b, "module(")
+        strings.write_string(b, string(v))
+        strings.write_string(b, ")")
     }
 }
 

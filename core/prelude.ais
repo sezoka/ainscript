@@ -1,0 +1,25 @@
+builtin println(..val) end
+builtin print(..val) end
+builtin timestamp() end
+
+builtin loadLibrary(path) end
+builtin unloadLibrary(lib_ptr) end
+builtin prepareLibraryFunc(lib_ptr ret_type name params) end
+builtin callLibraryFunc(func_handle params) end
+builtin error(msg) end
+
+builtin import(path) end
+
+def loadLibraryFunc(lib_ptr ret_type name params)
+    func_handle := prepareLibraryFunc(lib_ptr, ret_type, name, params);
+    def call(..params)
+        return callLibraryFunc(func_handle, params);
+    end
+    return call;
+end
+
+def assert(cond msg)
+    if !cond
+        error(msg);
+    end
+end
