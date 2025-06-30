@@ -36,18 +36,18 @@ Interpreter :: struct {
     heap_allocated_values: map[rawptr]core.Value,
     functions: map[^core.Func]void,
     marked_things: map[rawptr]void,
-    call_stack: [dynamic]^core.Scope,
+    call_stack: [dynamic]CallStackFrame,
     prev_alloc_count: uint,
     files: map[string]^FileState,
     prelude_scope: ^core.Scope,
     ain_directory: string,
 }
 
-// resetExeCtx:: proc(intr: ^Interpreter, file_path: string) {
-//     intr.exe_ctx = {
-//         file_path
-//     }
-// }
+
+CallStackFrame :: struct {
+    scope: ^core.Scope,
+    expr: ^core.Expr,
+}
 
 makeScope :: proc(intr: ^Interpreter, parent: ^core.Scope) -> ^core.Scope {
     scope := new(core.Scope)
@@ -71,15 +71,16 @@ popScope :: proc(intr: ^Interpreter) {
     intr.exe_ctx.curr_scope = intr.exe_ctx.curr_scope.parent
 }
 
-makeFileState :: proc(intr: ^Interpreter, path: string) -> ^FileState {
+makeFileState :: proc(intr: ^Interpreter, file: core.File) -> ^FileState {
     state := new(FileState)
-    state.exe_ctx.curr_file_path = path
+    state.ast = file
+    state.exe_ctx.curr_file_path = file.path
     state.exe_ctx.curr_scope = intr.prelude_scope
     return state
 }
 
 addFileState :: proc(intr: ^Interpreter, file: core.File) -> ^FileState {
-    file_state := makeFileState(intr, file.path)
+    file_state := makeFileState(intr, file)
     intr.files[file.path] = file_state
     return file_state
 }
@@ -109,7 +110,7 @@ interpretFile :: proc(intr: ^Interpreter, file: core.File) -> bool {
     intr.exe_ctx = &intr.files[file.path].exe_ctx
 
     pushScope(intr)
-    append(&intr.call_stack, intr.exe_ctx.curr_scope)
+    // append(&intr.call_stack, CallStackFrame{scope = intr.exe_ctx.curr_scope, expr = {}})
 
     intr.exe_ctx.root_scope = intr.exe_ctx.curr_scope
 
@@ -123,7 +124,7 @@ interpretFile :: proc(intr: ^Interpreter, file: core.File) -> bool {
 
 parseAndInterpretFile :: proc(intr: ^Interpreter, path: string, loc: Maybe(core.Location) = nil) -> (ok: bool) {
     pushScope(intr)
-    append(&intr.call_stack, intr.exe_ctx.curr_scope)
+    // append(&intr.call_stack, intr.exe_ctx.curr_scope)
 
     src, read_ok := core.readFile(path, loc)
     if !read_ok do return
@@ -131,7 +132,7 @@ parseAndInterpretFile :: proc(intr: ^Interpreter, path: string, loc: Maybe(core.
     tokens, tokenize_ok := tokenizer.tokenize(string(src), path)
     if !tokenize_ok do return
 
-    file_ast, parse_ok := parser.parseFile(tokens, path)
+    file_ast, parse_ok := parser.parseFile(tokens, path, string(src))
     if !parse_ok do return
 
     for stmt in file_ast.statements {
@@ -160,7 +161,7 @@ findScopeThatHasVar :: proc(intr: ^Interpreter, var_name: string) -> ^core.Scope
 defineVariable :: proc(intr: ^Interpreter, loc: core.Location, name: string, val: core.Value) -> bool {
     is_exists := findScopeThatHasVar(intr, name) == currScope(intr)
     if is_exists {
-        reportError(loc, "variable with name '%s' already exists", name) or_return
+        reportError(intr, loc, "variable with name '%s' already exists", name) or_return
     }
     scope := currScope(intr)
     scope.vars[name] = val
@@ -173,7 +174,7 @@ assignVariable :: proc(intr: ^Interpreter, loc: core.Location, name: string, val
         scope.vars[name] = val
         return true
     } else {
-        return reportError(loc, "variable with name '%s' is not defined", name)
+        return reportError(intr, loc, "variable with name '%s' is not defined", name)
     }
 }
 
@@ -182,7 +183,7 @@ findVar :: proc(intr: ^Interpreter, loc: core.Location, name: string) -> (val: c
     if scope != nil {
         return scope.vars[name], true
     } else {
-        reportError(loc, "variable with name '%s' is not defined", name) or_return
+        reportError(intr, loc, "variable with name '%s' is not defined", name) or_return
     }
     return
 }
@@ -209,7 +210,7 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
                 break
             }
         } else {
-            reportError(v.cond.loc, "expect bool as conditional value, but got: '%s'", formatType(cond_res)) or_return
+            reportError(intr, v.cond.loc, "expect bool as conditional value, but got: '%s'", formatType(cond_res)) or_return
         }
     case core.WhileStmt:
         for {
@@ -222,7 +223,7 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
                     break
                 }
             } else {
-                reportError(v.cond.loc, "expect bool as conditional value, but got: '%s'", formatType(cond_res)) or_return
+                reportError(intr, v.cond.loc, "expect bool as conditional value, but got: '%s'", formatType(cond_res)) or_return
             }
         }
     case core.RetStmt:
@@ -237,7 +238,7 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
                 return true
             }
         } else {
-            reportError(stmt.loc, "can't return from top-level code") or_return
+            reportError(intr, stmt.loc, "can't return from top-level code") or_return
         }
     case core.ExprStmt:
         interpretExpr(intr, v.expr) or_return
@@ -275,7 +276,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 }
             }
             reportError(
-                expr.loc, "field '%s' was not found in struct '%s'",
+                intr, expr.loc, "field '%s' was not found in struct '%s'",
                 e.field_name,
                 formatType(accessable)
             ) or_return
@@ -285,14 +286,14 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 return file_state.exe_ctx.root_scope.vars[e.field_name]
             } else {
                 reportError(
-                    expr.loc, "variable '%s' was not found in module '%s'",
+                    intr, expr.loc, "variable '%s' was not found in module '%s'",
                     e.field_name,
                     formatType(accessable)
                 ) or_return
             }
         } else {
             reportError(
-                expr.loc, "can use '.' operator only to access struct fields, but accessing '%s'",
+                intr, expr.loc, "can use '.' operator only to access struct fields, but accessing '%s'",
                 formatType(accessable)
             ) or_return
         }
@@ -311,7 +312,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
             if is_num {
                 return num, true
             } else {
-                reportError(expr.loc, "can use unary expession '+' only on numbers") or_return
+                reportError(intr, expr.loc, "can use unary expession '+' only on numbers") or_return
             }
         case .Minus:
             num, is_num := val.(core.Number)
@@ -320,14 +321,14 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 num.numeral = -num.numeral
                 return makeValue_Number(num), true
             } else {
-                reportError(expr.loc, "can use unary expession '-' only on numbers") or_return
+                reportError(intr, expr.loc, "can use unary expession '-' only on numbers") or_return
             }
         case .Negate:
             b, is_bool := val.(core.Bool)
             if is_bool {
                 return makeValue_Bool(!b), true
             } else {
-                reportError(expr.loc, "can use unary expession '!' only on booleans") or_return
+                reportError(intr, expr.loc, "can use unary expession '!' only on booleans") or_return
             }
         }
     case core.IndexExpr:
@@ -343,16 +344,16 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                         indexed_value := arr.values[index]
                         return indexed_value, true
                     } else {
-                        reportError(e.index.loc, "index out of bounds: array length == '%v', index == '%v'", len(arr.values), index) or_return
+                        reportError(intr, e.index.loc, "index out of bounds: array length == '%v', index == '%v'", len(arr.values), index) or_return
                     }
                 } else {
-                    reportError(e.indexable.loc, "can index only inside arrays") or_return
+                    reportError(intr, e.indexable.loc, "can index only inside arrays") or_return
                 }
             } else {
-                reportError(e.index.loc, "index must be a positive number, but got '%s'", formatValue(index_val)) or_return
+                reportError(intr, e.index.loc, "index must be a positive number, but got '%s'", formatValue(index_val)) or_return
             }
         } else {
-            reportError(e.index.loc, "index expression must evaluate to a number, but got '%s'", formatValue(index_val)) or_return
+            reportError(intr, e.index.loc, "index expression must evaluate to a number, but got '%s'", formatValue(index_val)) or_return
         }
     case core.BinaryExpr:
         left := interpretExpr(intr, e.left) or_return
@@ -387,7 +388,16 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
             case .Divide:
                 num.numeral = a.numeral * b.denominator
                 num.denominator = a.denominator * b.numeral
-                return makeValue_Number(num), true
+                if b.numeral == 0 {
+                    reportError(
+                        intr,
+                        expr.loc,
+                        "division by zero",
+                    ) or_return
+
+                } else {
+                    return makeValue_Number(num), true
+                }
             case .Less:
                 return makeValue_Bool(a.numeral * b.denominator < b.numeral * a.denominator), true
             case .Greater:
@@ -399,7 +409,14 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
             case:
             }
         } else {
-            reportError(expr.loc, "operator '%v' expects number operands, but got '%s' and '%s'", e.op, formatType(a), formatType(b)) or_return
+            reportError(
+                intr,
+                expr.loc,
+                "operator '%v' expects number operands, but got '%s' and '%s'",
+                e.op,
+                formatType(a),
+                formatType(b)
+            ) or_return
         }
     case core.IdentExpr:
         return findVar(intr, expr.loc, e.name)
@@ -449,7 +466,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
 
 
                 // create new scope
-                append(&intr.call_stack, intr.exe_ctx.curr_scope)
+                append(&intr.call_stack, CallStackFrame{scope = intr.exe_ctx.curr_scope, expr = expr})
                 defer pop(&intr.call_stack)
 
                 prev_scope := intr.exe_ctx.curr_scope
@@ -464,7 +481,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 }
 
                 if func.is_builtin {
-                    return handleBuiltins(intr, e, func)
+                    return handleBuiltins(intr, expr.loc, e, func)
                 } else {
                     prev_is_in_func := intr.exe_ctx.is_in_func
                     intr.exe_ctx.should_return = false
@@ -481,17 +498,17 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
                 }
             } else {
                 if has_rest_param {
-                    reportError(expr.loc,
+                    reportError(intr, expr.loc,
                         "number of function params and passed arguments don't match: func: '%d' or more; args: '%d'",
                         len(func.params), len(e.args)) or_return
                 } else {
-                    reportError(expr.loc,
+                    reportError(intr, expr.loc,
                         "number of function params and passed arguments don't match: func: '%d'; args: '%d'",
                         len(func.params), len(e.args)) or_return
                 }
             }
         } else {
-            reportError(expr.loc, "can call only function expressions, but got '%s'", formatType(maybe_func)) or_return
+            reportError(intr, expr.loc, "can call only function expressions, but got '%s'", formatType(maybe_func)) or_return
         }
     }
 
@@ -499,7 +516,7 @@ interpretExpr :: proc(intr: ^Interpreter, expr: ^core.Expr) -> (val: core.Value,
     return {}, false
 }
 
-handleBuiltins :: proc(intr: ^Interpreter, e: core.CallExpr, func: ^core.Func) -> (ret_val: core.Value, ok: bool) {
+handleBuiltins :: proc(intr: ^Interpreter, loc: core.Location, call: core.CallExpr, func: ^core.Func) -> (ret_val: core.Value, ok: bool) {
     if func.name == "println" || func.name == "print" {
         val := currScope(intr).vars["val"]
         val_arr := val.(^core.Array)
@@ -520,10 +537,10 @@ handleBuiltins :: proc(intr: ^Interpreter, e: core.CallExpr, func: ^core.Func) -
         path := currScope(intr).vars["path"]
         path_str, is_str := path.(core.String)
         if is_str {
-            lib := loadLibrary(e.callable.loc, string(path_str)) or_return
+            lib := loadLibrary(intr, call.callable.loc, string(path_str)) or_return
             return makeValue_Pointer(rawptr(lib)), true
         } else {
-            reportError(e.callable.loc, "builtin 'loadLibrary' expects library path as string") or_return
+            reportError(intr, call.callable.loc, "builtin 'loadLibrary' expects library path as string") or_return
         }
     } else if func.name == "unloadLibrary" {
         lib_ptr := currScope(intr).vars["lib_ptr"]
@@ -532,24 +549,24 @@ handleBuiltins :: proc(intr: ^Interpreter, e: core.CallExpr, func: ^core.Func) -
             dynlib.unload_library(dynlib.Library(ptr)) or_return
             return makeValue_Nil(), true
         } else {
-            reportError(e.callable.loc, "builtin 'unloadLibrary' expects library pointer") or_return
+            reportError(intr, call.callable.loc, "builtin 'unloadLibrary' expects library pointer") or_return
         }
     } else if func.name == "prepareLibraryFunc" {
-        return handlePrepareLibraryFuncBuiltin(intr, e)
+        return handlePrepareLibraryFuncBuiltin(intr, call)
     } else if func.name == "callLibraryFunc" {
-        return handleCallLibraryFuncBuiltin(intr, e)
+        return handleCallLibraryFuncBuiltin(intr, call)
     } else if func.name == "import" {
-        return handleImportBuiltin(intr, e)
+        return handleImportBuiltin(intr, call)
     } else if func.name == "error" {
         path_val := currScope(intr).vars["msg"]
         err_msg := checkType(
             intr,
-            e.args[0].loc,
+            loc,
             path_val,
             core.String,
             "error function expects error message"
         ) or_return
-        reportError(e.callable.loc, err_msg) or_return
+        reportError(intr, loc, err_msg) or_return
         return {}, false
     }
 
@@ -572,7 +589,7 @@ handleImportBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (ret_val
             tokens, tokenize_ok := tokenizer.tokenize(string(src), path)
             if !tokenize_ok do return
 
-            file_ast, parse_ok := parser.parseFile(tokens, path)
+            file_ast, parse_ok := parser.parseFile(tokens, path, string(src))
             if !parse_ok do return
 
             addFileState(intr, file_ast)
@@ -581,7 +598,7 @@ handleImportBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (ret_val
             return makeValue_Module(path), true
         }
     } else {
-        reportError(call.args[0].loc, "invalid file path") or_return
+        reportError(intr, call.args[0].loc, "invalid file path") or_return
         return {}, false
     }
 }
@@ -601,6 +618,7 @@ handleCallLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) ->
         if len(func_decl.param_types) == len(params.values) {
             for param, i in params.values {
                 converted_params[i] = convertASValueToCValuePtr(
+                    intr,
                     call.args[1].loc,
                     param,
                     func_decl.param_types[i],
@@ -608,15 +626,15 @@ handleCallLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) ->
             }
             ret_value_buff: [256]u8 
             ffi.call(&func_decl.cif, func_decl.func_ptr, &ret_value_buff, auto_cast &converted_params);
-            ret_value := convertCValueToASValue(call.callable.loc, &ret_value_buff, func_decl.ret_type) or_return
+            ret_value := convertCValueToASValue(intr, call.callable.loc, &ret_value_buff, func_decl.ret_type) or_return
             return ret_value, true;
         } else {
-            reportError(call.callable.loc,
+            reportError(intr, call.callable.loc,
                 "number of function params and passed arguments don't match: func: '%d' args: '%d'",
                 len(func_decl.param_types), len(params.values)) or_return
         }
     } else {
-        reportError(call.args[0].loc, "invalid func handle") or_return
+        reportError(intr, call.args[0].loc, "invalid func handle") or_return
     }
 
     return {}, false
@@ -631,7 +649,7 @@ handlePrepareLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr)
     name := checkType(intr, call.args[2].loc, name_val, core.String, "3 argument must be string representing name of function") or_return
     params := currScope(intr).vars["params"].(^core.Array)
 
-    ffi_ret_type := ainsTypeStringToFFIType(string(ret_type), call.args[1].loc) or_return
+    ffi_ret_type := ainsTypeStringToFFIType(intr, string(ret_type), call.args[1].loc) or_return
 
     ffi_params := make([dynamic]^ffi.ffi_type, len(params.values))
 
@@ -642,14 +660,14 @@ handlePrepareLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr)
             param_struct, is_struct_param := param.(^core.Struct)
             if is_struct_param || is_string_param {
                 if is_string_param {
-                    ffi_param := ainsTypeStringToFFIType(string(param_str), call.args[3].loc) or_return
+                    ffi_param := ainsTypeStringToFFIType(intr, string(param_str), call.args[3].loc) or_return
                     ffi_params[i] = ffi_param
                 } else {
-                    ffi_param := ainsStructTypeToFFIStructType(param_struct, call.args[3].loc) or_return
+                    ffi_param := ainsStructTypeToFFIStructType(intr, param_struct, call.args[3].loc) or_return
                     ffi_params[i] = ffi_param
                 }
             } else {
-                reportError(call.args[3].loc, "ffi param type must be string or struct, but got '%s'", formatType(param)) or_return
+                reportError(intr, call.args[3].loc, "ffi param type must be string or struct, but got '%s'", formatType(param)) or_return
             }
 
         }
@@ -665,10 +683,10 @@ handlePrepareLibraryFuncBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr)
             func_idx := len(intr.ffi_func_decls) - 1
             return makeValue_Number({i64(func_idx), 1}), true
         } else {
-            reportError(call.callable.loc, "failed preparing ffi call") or_return
+            reportError(intr, call.callable.loc, "failed preparing ffi call") or_return
         }
     } else {
-        reportError(call.callable.loc, dynlib.last_error()) or_return
+        reportError(intr, call.callable.loc, dynlib.last_error()) or_return
     }
 
     return {}, true
@@ -679,7 +697,7 @@ checkType :: proc(intr: ^Interpreter, loc: core.Location, value: core.Value, $T:
     if is_match {
         return inner_type, true
     } else {
-        reportError(loc, "%s, but got '%s'", msg, formatType(value)) or_return
+        reportError(intr, loc, "%s, but got '%s'", msg, formatType(value)) or_return
         return {}, false
     }
 }
@@ -696,9 +714,29 @@ printScopes :: proc(intr: ^Interpreter) {
 }
 
 @(require_results)
-reportError :: proc(loc: core.Location, fmt: string, args: ..any) -> bool {
-    strs : [3]string = { core.textColor("Interpreter", .Blue), ": ", fmt }
+reportError :: proc(intr: ^Interpreter, loc: core.Location, f: string, args: ..any) -> bool {
+    curr_file_ast := intr.files[intr.exe_ctx.curr_file_path].ast
+    curr_file := curr_file_ast.src
+    fmt.eprintfln("%s:", core.textColor("Stack trace", .Blue))
+
+    for i := 0; i < len(intr.call_stack); i += 1 {
+        call_expr_loc := intr.call_stack[i].expr.loc
+        if loc == call_expr_loc do continue
+        // core.printErr(call_expr_loc, str, ..args)
+        fmt.eprintfln(
+            "%s(\033[32m%s\033[0m:%d:%d):\n  -> %s",
+            core.textColor("call", .Blue),
+            call_expr_loc.file,
+            call_expr_loc.line,
+            call_expr_loc.col,
+            curr_file[call_expr_loc.start:call_expr_loc.end]
+        )
+    }
+
+    strs : [4]string = { "  -> ", curr_file[loc.start:loc.end], "\n",  f }
     str := strings.concatenate(strs[:], allocator=context.temp_allocator)
+
     core.printErr(loc, str, ..args)
+
     return false
 }

@@ -43,8 +43,8 @@ sweep :: proc(intr: ^Interpreter) {
 }
 
 markFiles :: proc(intr: ^Interpreter) {
-    for scope in intr.call_stack {
-        markScope(intr, scope)
+    for frame in intr.call_stack {
+        markScope(intr, frame.scope)
     }
 
     for _, file in intr.files {

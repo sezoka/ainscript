@@ -10,9 +10,10 @@ Parser :: struct {
     had_error: bool,
     tokens: []tokenizer.Token,
     curr: int,
+    last_tok: tokenizer.Token,
 }
 
-parseFile :: proc(tokens: []tokenizer.Token, path: string) -> (file: core.File, ok: bool) {
+parseFile :: proc(tokens: []tokenizer.Token, path: string, src: string) -> (file: core.File, ok: bool) {
     parser : Parser
     parser.tokens = tokens
 
@@ -27,6 +28,7 @@ parseFile :: proc(tokens: []tokenizer.Token, path: string) -> (file: core.File, 
     shrink(&stmts)
     file.statements = stmts[:]
     file.path = path
+    file.src = src
     return file, true
 }
 
@@ -41,6 +43,12 @@ expectSemicolon :: proc(p: ^Parser) -> bool {
 }
 
 parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
+    stmt = parseStmtImpl(p) or_return
+    stmt.loc.end = p.last_tok.loc.end
+    return stmt, true
+}
+
+parseStmtImpl :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
     tok := peek(p)
     loc := tok.loc
 
@@ -167,8 +175,10 @@ parseStmt :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
     return {}, false
 }
 
-parseExpr :: proc(p: ^Parser) -> (^core.Expr, bool) {
-    return parseEqual(p)
+parseExpr :: proc(p: ^Parser) -> (e: ^core.Expr, ok: bool) {
+    expr := parseEqual(p) or_return
+    expr.loc.end = p.last_tok.loc.end
+    return expr, true
 }
 
 parseEqual :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
@@ -402,10 +412,11 @@ makeExpr :: proc(loc: core.Location, v: core.ExprVart) -> (^core.Expr, bool) {
     return expr, expr != nil
 }
 
-next :: proc(t: ^Parser) -> tokenizer.Token {
-    curr := t.tokens[t.curr]
+next :: proc(p: ^Parser) -> tokenizer.Token {
+    curr := p.tokens[p.curr]
+    p.last_tok = curr
     if curr.kind != .Eof {
-        t.curr += 1
+        p.curr += 1
     }
     return curr
 }

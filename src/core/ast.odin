@@ -3,6 +3,7 @@ package aincore
 File :: struct {
     statements: []^Stmt,
     path: string,
+    src: string,
 }
 
 Stmt :: struct {

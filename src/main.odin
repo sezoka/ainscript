@@ -18,7 +18,6 @@ main :: proc() {
     }
     path := os.args[1]
 
-
     src, ok := core.readFile(path)
     if !ok do return
 
@@ -28,7 +27,7 @@ main :: proc() {
     tokens, tokenize_ok := tokenizer.tokenize(string(src), abs_path)
     if !tokenize_ok do return
 
-    file_ast, parse_ok := parser.parseFile(tokens, abs_path)
+    file_ast, parse_ok := parser.parseFile(tokens, abs_path, string(src))
     if !parse_ok do return
 
     interpreter.interpretMainFile(file_ast)

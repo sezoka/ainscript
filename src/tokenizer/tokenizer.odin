@@ -66,8 +66,11 @@ Token :: struct {
 }
 
 makeToken :: proc(t: ^Tokenizer, kind: TokenKind, value: TokenValue = {}) -> (Token, bool) {
+    loc := t.curr_token_loc
+    loc.start = uint(t.curr_token_start)
+    loc.end = uint(t.curr)
     return {
-        loc = t.curr_token_loc,
+        loc = loc,
         kind = kind,
         value = value,
         lexeme = getLexeme(t),
@@ -104,7 +107,7 @@ Tokenizer :: struct {
 tokenize :: proc(src: string, path: string) -> ([]Token, bool) {
     tkz : Tokenizer
     tkz.src = src
-    tkz.loc = {1, 1, path}
+    tkz.loc = {1, 1, path, 0, 0}
     tkz.keywords_map = makeKeywordsMap()
 
     tokens := make([dynamic]Token, context.allocator)

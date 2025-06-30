@@ -160,17 +160,20 @@ def userError()
     error("and now program should crash with this error message");
 end
 
+def divisionByZero(x)
+    return 123 / x;
+end
+
 def main()
-    variables();
-    functions();
-    closure();
-    strings();
-    arrays();
-    structs();
-    x := 123;
-    linkedList();
-    fileImportTest();
-    raylibExample();
+    // variables();
+    // functions();
+    // closure();
+    // strings();
+    // arrays();
+    // structs();
+    // linkedList();
+    // fileImportTest();
+    divisionByZero(0);
     // userError();
 end
 

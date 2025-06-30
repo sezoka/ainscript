@@ -29,3 +29,4 @@ clearBackground := loadLibraryFunc(raylib, "void", "ClearBackground", {TColor});
 drawRectangle := loadLibraryFunc(raylib, "void", "DrawRectangle", {"i32", "i32", "i32", "i32", TColor});
 getMouseX := loadLibraryFunc(raylib, "i32", "GetMouseX", {});
 getMouseY := loadLibraryFunc(raylib, "i32", "GetMouseY", {});
+
