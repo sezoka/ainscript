@@ -22,7 +22,7 @@ main :: proc() {
     src, ok := core.readFile(path)
     if !ok do return
 
-    abs_path, abs_ok := core.relToAbsFilePath("./", path)
+    abs_path, abs_ok := core.relToAbsFilePath(context.allocator, "./", path)
     assert(abs_ok)
 
     tokens, tokenize_ok := tokenizer.tokenize(string(src), abs_path)
@@ -30,10 +30,6 @@ main :: proc() {
 
     file_ast, parse_ok := parser.parseFile(tokens, abs_path)
     if !parse_ok do return
-
-    exe_path, ok_exe_path := os2.get_executable_path(context.temp_allocator)
-    assert(ok)
-    os.set_current_directory(exe_path)
 
     interpreter.interpretMainFile(file_ast)
 }

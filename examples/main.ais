@@ -91,7 +91,7 @@ end
 
 def structs()
     def Color(r g b a)
-        return #{
+        return struct {
             r = r,
             g = g,
             b = b,
@@ -104,51 +104,8 @@ def structs()
     println("color", color);
 end
 
-def loadRaylib()
-    raylib := loadLibrary("/usr/lib/libraylib.so");
-
-    TColor := #{
-        r = "u8",
-        g = "u8",
-        b = "u8",
-        a = "u8",
-    };
-
-    def Color(r g b a)
-        return #{r=r, g=g, b=b, a=a};
-    end
-
-    def unloadRaylib()
-        unloadLibrary(raylib);
-    end
-
-    initWindow := loadLibraryFunc(raylib, "void", "InitWindow", {"i32", "i32", "pointer"});
-    println("22222");
-
-    return #{
-        Color = Color,
-        initWindow = initWindow,
-        quitWindow = loadLibraryFunc(raylib, "void", "CloseWindow", {}),
-        beginDrawing = loadLibraryFunc(raylib, "void", "BeginDrawing", {}),
-        endDrawing = loadLibraryFunc(raylib, "void", "EndDrawing", {}),
-        windowShouldClose = loadLibraryFunc(raylib, "u8", "WindowShouldClose", {}),
-        drawFPS = loadLibraryFunc(raylib, "void", "DrawFPS", {"i32", "i32"}),
-        setTargetFPS = loadLibraryFunc(raylib, "void", "SetTargetFPS", {"i32"}),
-        getScreenWidth = loadLibraryFunc(raylib, "i32", "GetScreenWidth", {}),
-        getScreenHeight = loadLibraryFunc(raylib, "i32", "GetScreenHeight", {}),
-        drawText = loadLibraryFunc(raylib, "void", "DrawText", {"pointer", "i32", "i32", "i32", TColor}),
-        clearBackground = loadLibraryFunc(raylib, "void", "ClearBackground", {TColor}),
-        drawRectangle = loadLibraryFunc(raylib, "void", "DrawRectangle", {"i32", "i32", "i32", "i32", TColor}),
-        getMouseX = loadLibraryFunc(raylib, "i32", "GetMouseX", {}),
-        getMouseY = loadLibraryFunc(raylib, "i32", "GetMouseY", {}),
-        unloadRaylib = unloadRaylib,
-    };
-end
-
-
 def raylibExample()
-    println("11111111");
-    rl := loadRaylib();
+    rl := import("../vendor/raylib.ais");
 
     rl.initWindow(800, 600, "hello from AinScript!");
     rl.setTargetFPS(120);
@@ -161,13 +118,9 @@ def raylibExample()
 
     while rl.windowShouldClose() == 0
         rl.beginDrawing();
-        c := rl.Color(18, 18, 18, 255);
-        rl.clearBackground(c);
-        c2 := rl.Color(255, 255, 255, 255);
-        rl.drawText("Hello From AinScript!", text_x, text_y, 28, c2);
-        c3 := rl.Color(0, 255, 255, 255);
-        rl.drawRectangle(rl.getMouseX(), rl.getMouseY(), 100, 100, c3);
-        // println(rl.getMouseX(), rl.getMouseY(), c3);
+        rl.clearBackground(rl.Color(18, 18, 18, 255));
+        rl.drawText("Hello From AinScript!", text_x, text_y, 28, rl.Color(255, 255, 255, 255));
+        rl.drawRectangle(rl.getMouseX() - 50, rl.getMouseY() - 50, 100, 100, rl.Color(0, 255, 255, 255));
         rl.drawFPS(16, 16);
         rl.endDrawing();
     end
@@ -178,7 +131,7 @@ end
 
 def linkedList()
     def makeNode(val next)
-        return #{
+        return struct {
             val = val,
             next = next,
         };
@@ -198,11 +151,9 @@ def linkedList()
 end
 
 def fileImportTest()
-    lib := import("./lib.ais");
-    println(lib);
+    lib1 := import("././lib.ais");
     lib2 := import("./lib.ais");
-    println(lib2);
-    // lib.hello();
+    assert(lib1 == lib2, "same libs are equal");
 end
 
 def userError()
@@ -218,7 +169,7 @@ def main()
     structs();
     x := 123;
     linkedList();
-    // fileImportTest();
+    fileImportTest();
     raylibExample();
     // userError();
 end

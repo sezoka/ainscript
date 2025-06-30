@@ -6,7 +6,7 @@ import "core:fmt"
 runGC :: proc(intr: ^Interpreter) {
     free_all(context.temp_allocator)
     clear(&intr.marked_things)
-    markScopes(intr)
+    markFiles(intr)
     sweep(intr)
 }
 
@@ -42,25 +42,17 @@ sweep :: proc(intr: ^Interpreter) {
     }
 }
 
-// sweepFuncs :: proc(intr: ^Interpreter) {
-//     deleted_scopes := make([dynamic]^core.Scope, 0, len(intr.scopes))
-//     for scope, _ in intr.scopes {
-//         if !isMarked(intr, scope) {
-//             append(&deleted_scopes, scope)
-//         }
-//     }
-//     for scope in deleted_scopes {
-//         deleteScope(intr, scope)
-//     }
-//     delete(deleted_scopes)
-// }
-
-markScopes :: proc(intr: ^Interpreter) {
+markFiles :: proc(intr: ^Interpreter) {
     for scope in intr.call_stack {
         markScope(intr, scope)
     }
-    markScope(intr, intr.frame.curr_scope)
-    markValue(intr, intr.frame.ret_value)
+
+    for _, file in intr.files {
+        markScope(intr, file.exe_ctx.root_scope)
+    }
+
+    markScope(intr, intr.exe_ctx.curr_scope)
+    markValue(intr, intr.exe_ctx.ret_value)
 }
 
 markScope :: proc(intr: ^Interpreter, scope: ^core.Scope) {

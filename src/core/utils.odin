@@ -4,6 +4,7 @@ import "core:path/filepath"
 import "core:strings"
 import "core:fmt"
 import "core:os"
+import "base:runtime"
 
 TextColor :: enum {
     Red,
@@ -20,7 +21,7 @@ textColor :: proc($text: string, $color: TextColor) -> string {
     return ""
 }
 
-relToAbsFilePath :: proc(root: string, relpath: string) -> (string, bool) {
+relToAbsFilePath :: proc(allocator: runtime.Allocator, root: string, relpath: string) -> (string, bool) {
     paths : [2]string = {root, filepath.dir(relpath)}
     path := filepath.join(paths[:], allocator=context.temp_allocator)
     abs, ok := filepath.abs(path, allocator=context.temp_allocator)
@@ -28,7 +29,8 @@ relToAbsFilePath :: proc(root: string, relpath: string) -> (string, bool) {
         path_and_name : [2]string = {abs, filepath.base(relpath)}
         return filepath.join(path_and_name[:]), ok
     } else {
-        return path, ok
+        path_and_name : [2]string = {path, filepath.base(relpath)}
+        return filepath.join(path_and_name[:]), ok
     }
 }
 

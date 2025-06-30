@@ -23,3 +23,4 @@ def assert(cond msg)
         error(msg);
     end
 end
+

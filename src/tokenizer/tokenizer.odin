@@ -47,7 +47,7 @@ TokenKind :: enum {
     Dot,
     DotDot,
     While,
-    SharpBrace,
+    Struct,
     Nil,
 }
 
@@ -77,6 +77,7 @@ makeToken :: proc(t: ^Tokenizer, kind: TokenKind, value: TokenValue = {}) -> (To
 makeKeywordsMap :: proc() -> (keywords: map[string]TokenKind) {
     keywords["if"] = .If
     keywords["def"] = .Def
+    keywords["struct"] = .Struct
     keywords["nil"] = .Nil
     keywords["block"] = .Block
     keywords["while"] = .While
@@ -143,7 +144,7 @@ peek :: proc(t: ^Tokenizer) -> rune {
 
 reportError :: proc(t: ^Tokenizer, fmt: string, args: ..any) {
     t.had_error = true
-    strs : [3]string = { core.textColor("tokenizer", .Blue), ": ", fmt }
+    strs : [3]string = { core.textColor("Tokenizer", .Blue), ": ", fmt }
     str := strings.concatenate(strs[:], allocator=context.temp_allocator)
     core.printErr(t.curr_token_loc, str, ..args)
 }
@@ -247,10 +248,6 @@ nextToken :: proc(t: ^Tokenizer) -> (Token, bool) {
             return makeToken(t, .NotEqual)
         }
         return makeToken(t, .Bang)
-    case '#':
-        if match(t, '{') {
-            return makeToken(t, .SharpBrace)
-        }
     case '<':
         if match(t, '=') {
             return makeToken(t, .LessEqual)

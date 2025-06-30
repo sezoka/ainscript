@@ -1,1 +1,1 @@
-sh ./build && ./ais examples/main.ais
+sh ./build && ./bin/ais examples/main.ais

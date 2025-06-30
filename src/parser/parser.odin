@@ -352,7 +352,9 @@ parsePrimary :: proc(p: ^Parser) -> (expr: ^core.Expr, ok: bool) {
         expect(p, .RightBrace, "expect '}' after array values") or_return
         shrink(&values)
         return makeExpr(tok.loc, core.LiteralExpr(core.ArrayExpr{values=values[:]}))
-    case .SharpBrace:
+    case .Struct:
+        expect(p, .LeftBrace, "expect '{' after 'struct' keyword") or_return
+
         fields: [dynamic]core.StructFieldExpr
 
         for !matches(p, .RightBrace) {
@@ -422,7 +424,7 @@ peekNext :: proc(t: ^Parser) -> tokenizer.Token {
 
 reportError :: proc(p: ^Parser, loc: core.Location, fmt: string, args: ..any) {
     p.had_error = true
-    strs : [3]string = { core.textColor("parser", .Blue), ": ", fmt }
+    strs : [3]string = { core.textColor("Parser", .Blue), ": ", fmt }
     str := strings.concatenate(strs[:], allocator=context.temp_allocator)
     core.printErr(loc, str, ..args)
 }

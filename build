@@ -1,1 +1,1 @@
-odin build src -out:ais -o:none -debug # -sanitize:address 
+odin build src -out:bin/ais -o:none -debug # -sanitize:address 

@@ -1,3 +1,9 @@
+local := 1;
+
 def hello()
     println("hello from lib.ais");
+    local = local + 1;
+    println(local);
 end
+
+
