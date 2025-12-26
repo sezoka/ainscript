@@ -151,7 +151,7 @@ def linkedList()
 end
 
 def fileImportTest()
-    lib1 := import("././lib.ais");
+    lib1 := import("./lib.ais");
     lib2 := import("./lib.ais");
     assert(lib1 == lib2, "same libs are equal");
 end
@@ -164,17 +164,68 @@ def divisionByZero(x)
     return 123 / x;
 end
 
+def osModule()
+    os := import("../core/os.ais");
+    println(os.args);
+end
+
+def builtins()
+    arr := {1, 2, 3, 4, 5};
+    println("array len:", len(arr));
+    i := 0;
+    while i < len(arr)
+        print(arr[i]);
+        print(", ");
+        i = i + 1;
+    end
+    some_string := "some_string";
+    println("length of", some_string, "is:", len(some_string));
+end
+
+def controlFlow()
+    if true
+        println("true branch");
+    else
+        error("unreachable");
+    end
+
+    if false
+        error("unreachable");
+    else
+        println("else branch");
+    end
+
+    if 2 == 1
+        error("unreachable");
+    else if 2 == 3
+        error("unreachable");
+    else if 2 == 4
+        error("unreachable");
+    else if 2 == 2
+        println("2 == 2");
+    else if 2 == 5
+        error("unreachable");
+    end
+
+        
+
+end
+
 def main()
-    // variables();
-    // functions();
-    // closure();
-    // strings();
-    // arrays();
-    // structs();
-    // linkedList();
-    // fileImportTest();
-    divisionByZero(0);
+    variables();
+    functions();
+    closure();
+    strings();
+    arrays();
+    structs();
+    controlFlow();
+    linkedList();
+    fileImportTest();
+    // divisionByZero(0);
+    // raylibExample();
     // userError();
+    osModule();
+    builtins();
 end
 
 main();

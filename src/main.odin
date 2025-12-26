@@ -12,7 +12,7 @@ import vmem "core:mem/virtual"
 
 main :: proc() {
     context.logger = log.create_console_logger()
-    if len(os.args) != 2 {
+    if len(os.args) < 2 {
         core.print("usage: ais <file.ains>")
         return
     }

@@ -24,7 +24,8 @@ StmtVart :: union {
 
 IfStmt :: struct {
     cond: ^Expr,
-    body: ^Stmt,
+    then_branch: ^Stmt,
+    else_branch: ^Stmt,
 }
 
 WhileStmt :: struct {

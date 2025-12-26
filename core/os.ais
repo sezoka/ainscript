@@ -1,0 +1,5 @@
+builtin readFile(path) end
+builtin getCliArgs() end
+
+args := getCliArgs();
+

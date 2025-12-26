@@ -6,9 +6,10 @@ builtin loadLibrary(path) end
 builtin unloadLibrary(lib_ptr) end
 builtin prepareLibraryFunc(lib_ptr ret_type name params) end
 builtin callLibraryFunc(func_handle params) end
-builtin error(msg) end
 
+builtin error(msg) end
 builtin import(path) end
+builtin len(container) end
 
 def loadLibraryFunc(lib_ptr ret_type name params)
     func_handle := prepareLibraryFunc(lib_ptr, ret_type, name, params);

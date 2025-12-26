@@ -49,6 +49,7 @@ TokenKind :: enum {
     While,
     Struct,
     Nil,
+    Else,
 }
 
 TokenValue :: union {
@@ -91,6 +92,7 @@ makeKeywordsMap :: proc() -> (keywords: map[string]TokenKind) {
     keywords["do"] = .Do
     keywords["true"] = .True
     keywords["false"] = .False
+    keywords["else"] = .Else
     return keywords
 }
 

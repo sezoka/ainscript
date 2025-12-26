@@ -54,14 +54,44 @@ parseStmtImpl :: proc(p: ^Parser) -> (stmt: ^core.Stmt, ok: bool) {
 
     if matches(p, .If) {
         cond_expr := parseExpr(p) or_return
-        block_loc := peek(p).loc
-        // expect(p, .Do, "expect 'do' after conditional expression") or_return
-        stmts : [dynamic]^core.Stmt
-        for !matches(p, .End) {
-            stmt := parseStmt(p) or_return
-            append(&stmts, stmt)
+        then_branch_loc := peek(p).loc
+        else_branch_loc := peek(p).loc
+        then_stmts : [dynamic]^core.Stmt
+        else_stmts : [dynamic]^core.Stmt
+
+        had_else := false
+        for {
+            if peek(p).kind == .Else {
+                else_loc := peek(p).loc
+                next(p);
+                if had_else {
+                    reportError(p, else_loc, "if can have only one 'else'")
+                    return {}, false
+                } else {
+                    else_branch_loc = peek(p).loc
+                    had_else = true
+                    if peek(p).kind == .If && else_loc.line == peek(p).loc.line {
+                        stmt := parseStmt(p) or_return
+                        append(&else_stmts, stmt)
+                        break
+                    }
+                }
+            } else if matches(p, .End) {
+                break
+            } else {
+                stmt := parseStmt(p) or_return
+                if had_else {
+                    append(&else_stmts, stmt)
+                } else {
+                    append(&then_stmts, stmt)
+                }
+            }
         }
-        return makeStmt(loc, core.IfStmt{body = makeBlockStmt(block_loc, stmts[:]), cond = cond_expr}) 
+        return makeStmt(loc, core.IfStmt{
+            then_branch = makeBlockStmt(then_branch_loc, then_stmts[:]),
+            else_branch = had_else ? makeBlockStmt(else_branch_loc, else_stmts[:]) : nil,
+            cond = cond_expr
+        }) 
     } else if matches(p, .While) {
         cond_expr := parseExpr(p) or_return
         block_loc := peek(p).loc

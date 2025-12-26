@@ -1,0 +1,4 @@
+
+os := import("../core/os.ais");
+
+println(os.args);

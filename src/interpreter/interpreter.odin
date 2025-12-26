@@ -11,6 +11,7 @@ import "core:path/filepath"
 import "../tokenizer"
 import "../parser"
 import "core:os/os2"
+import "core:os"
 
 void :: struct {}
 
@@ -205,9 +206,9 @@ interpretStmt :: proc(intr: ^Interpreter, stmt: ^core.Stmt) -> bool {
         cond_bool, is_bool := cond_res.(bool)
         if is_bool {
             if cond_bool {
-                interpretStmt(intr, v.body) or_return
-            } else {
-                break
+                interpretStmt(intr, v.then_branch) or_return
+            } else if v.else_branch != nil {
+                interpretStmt(intr, v.else_branch) or_return
             }
         } else {
             reportError(intr, v.cond.loc, "expect bool as conditional value, but got: '%s'", formatType(cond_res)) or_return
@@ -530,6 +531,8 @@ handleBuiltins :: proc(intr: ^Interpreter, loc: core.Location, call: core.CallEx
             fmt.println()
         }
         return makeValue_Nil(), true
+    } else if func.name == "len" {
+        return handleLenBuiltin(intr, call)
     } else if func.name == "timestamp" {
         numeral : i64 = time.to_unix_nanoseconds(time.now())
         return core.Number{numeral, 1}, true
@@ -568,10 +571,34 @@ handleBuiltins :: proc(intr: ^Interpreter, loc: core.Location, call: core.CallEx
         ) or_return
         reportError(intr, loc, err_msg) or_return
         return {}, false
+    } else if func.name == "getCliArgs" {
+        return handleGetCliArgsBuiltin(intr, call)
     }
 
     log.error("unhandled")
     return {}, false
+}
+
+handleLenBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (ret_val: core.Value, ok: bool) {
+    path_val := currScope(intr).vars["container"]
+
+    #partial switch v in path_val {
+    case ^core.Array:
+        return makeValue_Number({i64(len(v.values)), 1}), true
+    case core.String:
+        return makeValue_Number({i64(len(v)), 1}), true
+    case:
+        reportError(intr, call.args[0].loc, "len expects array or string value, but got '%s'", formatType(path_val)) or_return
+        return {}, false
+    }
+}
+
+handleGetCliArgsBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (ret_val: core.Value, ok: bool) {
+    values : [dynamic]core.Value
+    for value in os.args {
+        append(&values, value)
+    }
+    return makeValue_Array(intr, values), true
 }
 
 handleImportBuiltin :: proc(intr: ^Interpreter, call: core.CallExpr) -> (ret_val: core.Value, ok: bool) {
@@ -722,7 +749,7 @@ reportError :: proc(intr: ^Interpreter, loc: core.Location, f: string, args: ..a
     for i := 0; i < len(intr.call_stack); i += 1 {
         call_expr_loc := intr.call_stack[i].expr.loc
         if loc == call_expr_loc do continue
-        // core.printErr(call_expr_loc, str, ..args)
+        // core.printErr(call_expr_loc, "", ..args)
         fmt.eprintfln(
             "%s(\033[32m%s\033[0m:%d:%d):\n  -> %s",
             core.textColor("call", .Blue),
